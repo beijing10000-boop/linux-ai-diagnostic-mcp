@@ -53,6 +53,11 @@ def home(request: HttpRequest):
     except HTTPException: return RedirectResponse("/login",status_code=303)
     return FileResponse("web/index.html")
 
+@app.get("/settings")
+def settings_page(request: HttpRequest):
+    security.admin(request)
+    return FileResponse("web/settings.html")
+
 @app.get("/inventory")
 def inventory_page(request: HttpRequest):
     security.admin(request)
