@@ -33,3 +33,34 @@ jobs:
         run: ruff check . --select E4,E7,E9,F
       - name: Regression tests
         run: pytest -q
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare persistent data ownership
+        run: |
+          mkdir -p data
+          sudo chown 10001:10001 data
+          chmod 700 data
+      - name: Verify Compose
+        run: docker compose config --quiet
+      - name: Start development container
+        run: docker compose up -d --build
+      - name: Check port 9099 and one-time bootstrap
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:9099/healthz >/tmp/health.json; then
+              break
+            fi
+            sleep 2
+          done
+          python -c 'import json; assert json.load(open("/tmp/health.json"))["version"] == "0.1.0"'
+          docker compose exec -T web test -s /app/data/bootstrap.token
+          test "$(docker compose port web 9099)" = "127.0.0.1:9099"
+      - name: Docker logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+      - name: Stop containers
+        if: always()
+        run: docker compose down
