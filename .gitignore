@@ -1,0 +1,8 @@
+.env
+*.pem
+*.key
+id_ed25519*
+__pycache__/
+.venv/
+*.db
+.pytest_cache/
