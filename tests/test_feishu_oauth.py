@@ -1,5 +1,4 @@
 from urllib.parse import parse_qs, urlsplit
-from app import security
 from app import main
 from .conftest import OPEN_ID
 
