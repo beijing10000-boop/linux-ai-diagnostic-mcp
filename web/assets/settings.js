@@ -1,47 +1,115 @@
 "use strict";
-(async()=>{
-  try{
-    const data=await Diag.api("settings");
-    for(const key of ["app_id","admin_open_id","public_url"])
-      document.getElementById(key).value=data[key]||"";
-    document.getElementById("sshStatus").textContent=data.ssh_private_key_configured?
-      "已配置加密 SSH 私钥":"尚未配置 SSH 私钥";
-  }catch(e){Diag.message("status",e.message,true);}
-})();
-document.getElementById("saveSettings").addEventListener("click",async()=>{
-  const data={};
-  for(const key of ["app_id","admin_open_id","public_url"]){
-    const value=document.getElementById(key).value.trim();
-    if(value)data[key]=value;
+(() => {
+  const $ = (id) => document.getElementById(id);
+  let initial = null,
+    logs = [];
+  function callback() {
+    $("callbackUrl").textContent =
+      ($("public_url").value.trim().replace(/\/$/, "") || "https://你的域名") +
+      "/auth/feishu/callback";
   }
-  const secret=document.getElementById("app_secret").value;
-  if(secret)data.app_secret=secret;
-  try{
-    const result=await Diag.api("settings",{method:"PUT",body:data});
-    document.getElementById("app_secret").value="";
-    Diag.message("status",result.reauth_required?"设置已更新，请重新登录":"设置已保存");
-    if(result.reauth_required)location.href="/login";
-  }catch(e){Diag.message("status",e.message,true);}
-});
-document.getElementById("saveSSH").addEventListener("click",async()=>{
-  const key=document.getElementById("ssh_key").value;
-  const passphrase=document.getElementById("ssh_passphrase").value;
-  if(!key){Diag.message("status","请先粘贴 Ed25519 私钥",true);return;}
-  try{
-    await Diag.api("settings/ssh",{method:"PUT",body:{private_key:key,passphrase}});
-    document.getElementById("ssh_key").value="";
-    document.getElementById("ssh_passphrase").value="";
-    document.getElementById("sshStatus").textContent="已配置加密 SSH 私钥";
-    Diag.message("status","SSH 私钥已加密保存，不会回显");
-  }catch(e){Diag.message("status",e.message,true);}
-});
-document.getElementById("logout").addEventListener("click",async()=>{
-  try{await Diag.api("logout",{method:"POST"});location.href="/login";}
-  catch(e){Diag.message("status",e.message,true);}
-});
-(async()=>{try{const logs=await Diag.api("audit");const list=document.getElementById("audit");
-  logs.slice(0,15).forEach(r=>{const tr=document.createElement("tr");
-    for(const value of [new Date(r.time*1000).toLocaleString(),r.actor,r.action]){
-      const td=document.createElement("td");td.textContent=String(value);tr.append(td);
-    }list.append(tr);});
-}catch(e){Diag.message("status",e.message,true);}})();
+  async function load() {
+    try {
+      initial = await Diag.api("settings");
+      for (const key of ["app_id", "admin_open_id", "public_url"])
+        $(key).value = initial[key] || "";
+      $("sshStatus").textContent = initial.ssh_private_key_configured
+        ? "已配置专用 SSH 私钥"
+        : "尚未配置 SSH 私钥";
+      callback();
+    } catch (e) {
+      Diag.message("status", e.message, true);
+    }
+  }
+  function renderLogs() {
+    const q = $("auditSearch").value.toLowerCase().trim();
+    $("audit").replaceChildren();
+    const filtered = logs.filter((r) =>
+      [r.actor, r.action].some((s) => s.toLowerCase().includes(q)),
+    );
+    filtered.forEach((r) => {
+      const tr = Diag.node("tr");
+      [Diag.date(r.time), r.actor, r.action].forEach((v, i) =>
+        tr.append(Diag.node("td", v, i === 2 ? "mono" : "")),
+      );
+      $("audit").append(tr);
+    });
+    $("auditEmpty").hidden = filtered.length > 0;
+  }
+  async function loadAudit() {
+    try {
+      logs = await Diag.api("audit");
+      renderLogs();
+      Diag.message("auditStatus", "");
+    } catch (e) {
+      Diag.message("auditStatus", e.message, true);
+    }
+  }
+  $("public_url").addEventListener("input", callback);
+  $("copyCallback").addEventListener("click", () =>
+    Diag.copy($("callbackUrl").textContent),
+  );
+  $("settingsForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!initial) {
+      Diag.message("settingsStatus", "配置尚未加载完成，请稍后刷新", true);
+      return;
+    }
+    const data = {};
+    for (const key of ["app_id", "admin_open_id", "public_url"]) {
+      const value = $(key)
+        .value.trim()
+        .replace(key === "public_url" ? /\/$/ : /$^/, "");
+      if (value !== initial[key]) data[key] = value;
+    }
+    if ($("app_secret").value) data.app_secret = $("app_secret").value;
+    if (!Object.keys(data).length) {
+      Diag.message("settingsStatus", "设置未发生变化，无需保存");
+      return;
+    }
+    Diag.busy($("saveSettings"), async () => {
+      try {
+        const result = await Diag.api("settings", {
+          method: "PUT",
+          body: data,
+        });
+        $("app_secret").value = "";
+        Diag.message(
+          "settingsStatus",
+          result.reauth_required ? "配置已保存，即将重新登录…" : "配置已保存",
+        );
+        if (result.reauth_required) location.assign(result.redirect_url);
+        else await load();
+      } catch (err) {
+        Diag.message("settingsStatus", err.message, true);
+      }
+    });
+  });
+  $("sshForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    Diag.busy($("saveSSH"), async () => {
+      try {
+        await Diag.api("settings/ssh", {
+          method: "PUT",
+          body: {
+            private_key: $("ssh_key").value,
+            passphrase: $("ssh_passphrase").value,
+          },
+        });
+        $("sshForm").reset();
+        $("sshStatus").textContent = "已配置专用 SSH 私钥";
+        Diag.message("sshSaveStatus", "SSH 私钥已加密保存");
+        Diag.toast("SSH 凭据已保存");
+        await loadAudit();
+      } catch (err) {
+        Diag.message("sshSaveStatus", err.message, true);
+      }
+    });
+  });
+  $("refreshAudit").addEventListener("click", () =>
+    Diag.busy($("refreshAudit"), loadAudit, "刷新中"),
+  );
+  $("auditSearch").addEventListener("input", renderLogs);
+  load();
+  loadAudit();
+})();

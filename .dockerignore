@@ -12,3 +12,6 @@ __pycache__
 known_hosts
 README.md
 docs
+
+node_modules
+ui-artifacts

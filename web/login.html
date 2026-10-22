@@ -1,1 +1,83 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>飞书登录 · Linux AI Diagnostic</title><link rel="stylesheet" href="/assets/style.css"></head><body><main class="auth-page"><section class="card auth-card"><div class="eyebrow">Secure Sign-in · 管理员验证</div><h1>◈ Linux AI Diagnostic</h1><p>使用飞书 Open ID 验证管理员身份。</p><p class="muted">只允许系统初始化时设置的管理员账号登录。Web、诊断 API 和资产操作统一校验会话与权限。</p><a class="pill" href="/auth/feishu">使用飞书登录 →</a><p class="footnote">v0.1.0 · SSH 管理与诊断仅允许已授权主机</p></section></main></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>飞书登录 · Linux AI Diagnostic</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script src="/assets/login.js" defer></script>
+  </head>
+  <body class="auth-body">
+    <main class="auth-layout">
+      <section class="auth-intro">
+        <a class="brand auth-brand" href="/"
+          ><span class="brand-mark"
+            ><svg class="icon" aria-hidden="true">
+              <use href="/assets/icons.svg#terminal"></use></svg></span
+          ><span>Linux AI<span class="brand-sub">DIAGNOSTIC MCP</span></span></a
+        >
+        <div class="auth-copy">
+          <div class="eyebrow">A CLEARER VIEW OF YOUR SYSTEMS</div>
+          <h1>让排查，<br />从容有序<span class="heading-dot">.</span></h1>
+          <p>
+            安全连接你的 Linux 基础设施，<br />让实时诊断成为每一次判断的依据。
+          </p>
+          <div class="auth-features">
+            <span
+              ><svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#shield"></use>
+              </svg>
+              身份验证</span
+            ><span
+              ><svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#key"></use>
+              </svg>
+              加密凭据</span
+            ><span
+              ><svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#clock"></use>
+              </svg>
+              操作可追溯</span
+            >
+          </div>
+        </div>
+        <div class="auth-intro-footer">
+          Linux AI Diagnostic MCP <span>面向运维的诊断工作空间</span>
+        </div>
+      </section>
+      <section class="auth-content">
+        <div class="login-card">
+          <div class="login-icon">
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/icons.svg#shield"></use>
+            </svg>
+          </div>
+          <div class="eyebrow">WELCOME BACK</div>
+          <h2>登录你的工作空间</h2>
+          <p class="muted">使用已授权的飞书管理员账号继续。</p>
+          <div id="loginError" class="notice error" role="alert" hidden></div>
+          <a class="primary login-button" href="/auth/feishu"
+            >使用飞书登录
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/icons.svg#arrow"></use></svg
+          ></a>
+          <div class="auth-divider"></div>
+          <p class="field-hint">
+            登录后将通过飞书 Open ID 核验身份。<br />如无法访问，请联系系统管理员确认授权。
+          </p>
+          <div class="auth-lock">
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/icons.svg#shield"></use>
+            </svg>
+            安全会话 · 8 小时有效
+          </div>
+        </div>
+        <div class="auth-content-footer">
+          你的连接凭据与诊断记录仅对管理员可见
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

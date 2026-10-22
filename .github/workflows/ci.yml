@@ -34,6 +34,33 @@ jobs:
       - name: Regression tests
         run: pytest -q
 
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: pip install -r requirements-dev.txt
+      - run: npm ci
+      - run: npm run check:web
+      - run: npx playwright install --with-deps chromium
+      - name: Browser regression against isolated HTTPS fixture
+        run: npm run test:ui
+        env:
+          DIAG_PYTHON: python
+      - name: Upload UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-console-screenshots
+          path: ui-artifacts/
+          retention-days: 7
+
   docker-smoke:
     runs-on: ubuntu-latest
     steps:

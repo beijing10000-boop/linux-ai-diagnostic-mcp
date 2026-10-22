@@ -41,7 +41,7 @@ server {
         proxy_pass http://127.0.0.1:9099;
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-Proto https;
-        proxy_read_timeout 30s;
+        proxy_read_timeout 90s;
     }
 }
 ```
@@ -77,7 +77,18 @@ docker compose ps
 需要 **同时备份** `data/master.key` 与 `data/inventory.db`，并设置受保护的备份权限。主密钥丢失将无法解密 App Secret 或 SSH 私钥。不要将 `data` 挂载为公开静态目录。
 
 ## 当前限制
-- 代理是资产登记，不承担跨网段 SSH 调度。
+- 支持一层 SSH 跳板代理，配置见 [跳板代理](PROXY_DESIGN.md)；不支持主动回连 Agent 与离线任务队列。
 - MCP stdio 仅供可信 OS/容器操作者，未实现每个 AI 调用者的权限认证。
 - 不提供 SSH 任意 Shell、文件读写、后台任务、外网主机访问。
 - v0.1.0 不是生产安全合格声明。
+
+## 现有安装升级
+
+1. 维护窗口中备份数据库和原始 `master.key`，不要更换或删除主密钥。
+2. 更新仓库代码后执行 `docker compose up -d --build`。
+3. 启动会自动补齐旧代理的连接字段并创建诊断历史表；原有配置保留。
+4. 在每台目标机重新安装更新后的 `gateway/ai-diagnostic-gateway`（root:root，0755）。
+5. 登录 Web 核对 SSH 配置。旧版本登记的代理需要补齐 IP、公钥和专用私钥。
+6. 在已授权测试主机上执行 CPU / 内存等诊断，核对输出、历史与安全审计。
+
+诊断历史最多保存 500 次，输出与错误信息加密存储。Web 返回最近 50 条摘要，工作台默认展示最新 8 条。主密钥缺失时应用拒绝启动，请恢复原始密钥。

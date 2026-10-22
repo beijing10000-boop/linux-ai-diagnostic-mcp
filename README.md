@@ -4,7 +4,7 @@
 
 **v0.1.0 · 内测基线** — 中文 Web、飞书 OAuth 管理员身份、SSH 限制诊断、主机组、代理资产管理、安全审计与本地 MCP stdio 工具。
 
-> **安全提醒：当前版本未完成真实飞书租户/生产服务器的端到端验证，不允许直接公网开放 9099 或接入生产 root 密钥。** 分布式 Proxy Agent 尚未实现执行通道；上游 classfang 的任意 Shell / SFTP / Job 不开放。
+> **安全提醒：当前版本未完成真实飞书租户/生产服务器的端到端验证，不允许直接公网开放 9099 或接入生产 root 密钥。** 当前代理通过 SSH 跳板通道执行诊断；主动回连 Agent 尚未实现。上游 classfang 的任意 Shell / SFTP / Job 不开放。
 
 ## 核心功能
 
@@ -12,7 +12,9 @@
 |---|---|
 | 飞书 Open ID 管理员登录 / 首次初始化 | 实现基础功能，待真实应用验证 |
 | 加密的 Web 配置 / SSH Ed25519 私钥 | 已实现 |
-| 主机组 / 主机 / 代理管理 | 已实现；代理仅登记 |
+| 主机组 / 主机 / 代理管理 | 支持新增、编辑、删除、搜索与分组筛选 |
+| SSH 跳板代理 | 独立凭据、双端公钥核验、目标端口转发 |
+| 诊断历史 | 加密保存最近 500 次记录，Web 展示最新 8 条，摘要 API 返回最近 50 条 |
 | 只读 SSH 固定动作 / 强制命令 | 已实现；需目标端安装网关 |
 | MCP 标准工具（stdio） | 已实现，本地受信任进程可运行 |
 | 公网 MCP HTTP、SFTP、任意 Shell | 明确禁用 |
@@ -56,6 +58,39 @@ from="DIAGNOSTIC_SERVER_IP",restrict,command="/usr/local/sbin/ai-diagnostic-gate
 docker compose exec -T web python -m app.mcp_server
 ```
 
-这是供可信内部进程启动的 MCP **stdio** 服务，提供 `list_linux_hosts` 和 `diagnose_linux_host`。标准 MCP HTTP 服务、跨机房代理任务通道及用户级 MCP 身份认证仍在规划，**不要直接向公网开放 stdio 包装服务**。
+这是供可信内部进程启动的 MCP **stdio** 服务，提供 `list_linux_hosts` 和 `diagnose_linux_host`。标准 MCP HTTP 服务、主动回连代理队列及用户级 MCP 身份认证仍在规划，**不要直接向公网开放 stdio 包装服务**。
 
-详见 [部署说明](docs/DEPLOYMENT.md)、[飞书认证](docs/FEISHU_SETUP.md)、[安全说明](SECURITY.md)、[更新日志](CHANGELOG.md)。
+## 控制台与诊断体验
+
+以下截图来自隔离测试环境，主机与诊断数据为测试夹具。
+
+![诊断工作台](docs/screenshots/dashboard.png)
+
+
+- 统一导航、桌面控制台布局、随系统切换的深浅色主题。
+- 主机组显示名称，资产支持搜索、分组筛选与弹窗编辑；主机可直接进入诊断。
+- 诊断时防重复提交，服务项目按需显示服务名字段，连接错误提供具体排查提示。
+- 标准输出与标准错误分开呈现，支持 JSON 切换、复制和历史回看；输出过大时保留已收集结果。
+- 登录配置实际变化时才注销会话；更新域名后转到新的登录地址。
+
+## 升级已有安装
+
+备份 `data/inventory.db` 与 `data/master.key` 后更新代码并重建容器。启动时自动补齐代理字段和诊断历史表，原有主机、组、飞书配置和 SSH 凭据保留。旧代理保持“待配置”，请在 Web 中补齐后使用。
+
+目标端的命令网关也有更新：解决命令路径差异并限制子进程输出。请按部署说明重新安装 `gateway/ai-diagnostic-gateway`。默认端口继续为 **9099**。
+
+## 开发验证
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pytest -q
+.venv/bin/ruff check . --select E4,E7,E9,F
+npm ci
+npx playwright install --with-deps chromium
+npm run test:ui
+```
+
+浏览器测试使用独立临时数据库、测试身份与 HTTPS 服务器，覆盖初始化、认证门禁、资产 CRUD、错误提示、诊断历史、桌面尺寸和深色布局。其诊断结果为测试夹具；SSH 握手与跳板转发由另外的真实 Paramiko 连接测试覆盖。GitHub Actions 会保存页面截图供复核。
+
+详见 [跳板代理配置](docs/PROXY_DESIGN.md)、[部署说明](docs/DEPLOYMENT.md)、[飞书认证](docs/FEISHU_SETUP.md)、[安全说明](SECURITY.md)、[更新日志](CHANGELOG.md)。

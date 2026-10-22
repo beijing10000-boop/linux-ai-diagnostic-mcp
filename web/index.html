@@ -1,7 +1,290 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>诊断工作台 · Linux AI Diagnostic</title><link rel="stylesheet" href="/assets/style.css"><script src="/assets/common.js" defer></script><script src="/assets/dashboard.js" defer></script></head>
-<body><header class="topbar"><div><a class="brand" href="/">◈ Linux AI Diagnostic <span data-version></span></a><nav class="nav"><a href="/">诊断工作台</a><a href="/inventory">资产与代理</a><a href="/settings">系统设置</a></nav></div></header>
-<main class="container"><div class="headline"><div><div class="eyebrow">Overview / 管理控制台</div><h1>服务器诊断工作台</h1><p class="muted">SSH 公钥校验 · root 强制命令 · 只读诊断</p></div><span class="pill">安全策略已启用</span></div>
-<div class="grid"><section class="card"><div class="muted">Linux 主机</div><div class="stat" id="hostCount">—</div><small>已登记主机</small></section><section class="card"><div class="muted">主机组</div><div class="stat" id="groupCount">—</div><small>分类管理</small></section><section class="card"><div class="muted">代理节点</div><div class="stat" id="proxyCount">—</div><small>代理执行尚未启用</small></section>
-<section class="card span-2"><h2>发起远程诊断</h2><p class="notice">只允许诊断已登记的私有 IP，必须预先固定 SSH 主机公钥。任何根账号任意 Shell、文件写入及代理任务转发均不开放。</p><label for="host">目标主机</label><select id="host"><option value="">请选择已登记主机</option></select><div class="form-cols"><div><label for="action">诊断项目</label><select id="action"><option value="cpu">CPU 负载</option><option value="memory">内存</option><option value="disk">磁盘</option><option value="network">网络接口</option><option value="sockets">网络连接</option><option value="processes">进程</option><option value="service">服务状态</option></select></div><div><label for="service">服务名（仅服务状态使用）</label><input id="service" placeholder="nginx"></div></div><button id="run">开始诊断</button><p id="notice" class="status"></p></section>
-<section class="card"><h2>运行说明</h2><p>Web 使用飞书管理员 Open ID 登录，所有诊断请求同时校验浏览器会话与 CSRF Token。</p><p>SSH 私钥通过“系统设置”录入，以密文存储；目标服务器必须已安装诊断网关。</p><p class="muted">部署默认端口：9099</p></section>
-<section class="card wide"><h2>诊断结果</h2><pre id="output">请选择主机与诊断项目。</pre></section></div><p class="footnote">Linux AI Diagnostic · v0.1.0 开发版本 · 未通过生产安全验收</p></main></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>诊断工作台 · Linux AI Diagnostic</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script src="/assets/common.js" defer></script>
+    <script src="/assets/dashboard.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <aside class="sidebar">
+      <a href="/" class="brand"
+        ><span class="brand-mark"
+          ><svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#terminal"></use></svg></span
+        ><span>Linux AI<span class="brand-sub">DIAGNOSTIC MCP</span></span></a
+      >
+      <div class="nav-caption">工作空间</div>
+      <nav aria-label="主导航">
+        <a href="/" class="nav-item active" aria-current="page"
+          ><svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#grid"></use></svg
+          ><span>诊断工作台</span></a
+        ><a href="/inventory" class="nav-item"
+          ><svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#server"></use></svg
+          ><span>资产与代理</span></a
+        ><a href="/settings" class="nav-item"
+          ><svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#settings"></use></svg
+          ><span>系统设置</span></a
+        >
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="mode-card">
+          <svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#shield"></use>
+          </svg>
+          <div>
+            <strong>受限 SSH 诊断</strong><span>固定动作 · 公钥校验</span>
+          </div>
+        </div>
+        <div class="sidebar-meta">
+          <span data-version>版本读取中</span><span>端口 9099</span>
+        </div>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="breadcrumb">
+          工作空间 <span>/</span> <strong>诊断工作台</strong>
+        </div>
+        <div class="user-area">
+          <span class="user-badge"
+            ><svg class="icon" aria-hidden="true">
+              <use href="/assets/icons.svg#shield"></use>
+            </svg>
+            管理员</span
+          ><button
+            class="icon-button"
+            data-logout
+            aria-label="退出登录"
+            title="退出登录"
+          >
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/icons.svg#logout"></use>
+            </svg>
+          </button>
+        </div>
+      </header>
+      <main id="main" class="container">
+        <div class="headline">
+          <div>
+            <div class="eyebrow">OPERATIONS OVERVIEW</div>
+            <h1>诊断工作台<span class="heading-dot">.</span></h1>
+            <p class="muted">从实时数据出发，找到问题的下一步。</p>
+          </div>
+          <div class="headline-actions">
+            <span id="today" class="muted small"></span
+            ><button id="refresh" class="secondary">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#refresh"></use>
+              </svg>
+              刷新
+            </button>
+          </div>
+        </div>
+        <div id="loadError" class="notice error" role="alert" hidden></div>
+        <div class="stats">
+          <a class="stat-card" href="/inventory"
+            ><span class="stat-label"
+              >已登记主机
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#server"></use></svg></span
+            ><strong id="hostCount">—</strong
+            ><span class="stat-foot"
+              >Linux 服务器
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#arrow"></use></svg></span></a
+          ><a class="stat-card" href="/inventory#groups"
+            ><span class="stat-label"
+              >主机组
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#folder"></use></svg></span
+            ><strong id="groupCount">—</strong
+            ><span class="stat-foot"
+              >按环境组织资产
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#arrow"></use></svg></span></a
+          ><a class="stat-card" href="/inventory#proxies"
+            ><span class="stat-label"
+              >跳板代理
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#route"></use></svg></span
+            ><strong id="proxyCount">—</strong
+            ><span id="proxySummary" class="stat-foot">正在读取配置</span></a
+          ><a class="stat-card credential-stat" href="/settings"
+            ><span class="stat-label"
+              >SSH 凭据
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#key"></use></svg></span
+            ><strong id="keyState" class="text-stat">读取中</strong
+            ><span id="keySummary" class="stat-foot"
+              >加密存储 · 专用密钥
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#arrow"></use></svg></span
+          ></a>
+        </div>
+        <div class="diagnostic-grid">
+          <section class="card diagnosis-card">
+            <div class="section-heading">
+              <div>
+                <div class="eyebrow">NEW DIAGNOSTIC</div>
+                <h2>发起诊断</h2>
+              </div>
+              <span class="badge neutral">固定动作</span>
+            </div>
+            <form id="diagnoseForm">
+              <label for="host">目标主机</label
+              ><select id="host" name="host_id" required disabled>
+                <option value="">正在加载主机…</option>
+              </select>
+              <p id="hostHint" class="field-hint">
+                选择已登记并核验公钥的 Linux 服务器
+              </p>
+              <label for="action">诊断项目</label
+              ><select id="action" name="action">
+                <option value="cpu">CPU 负载</option>
+                <option value="memory">内存使用</option>
+                <option value="disk">磁盘与文件系统</option>
+                <option value="network">网络接口</option>
+                <option value="sockets">网络连接概况</option>
+                <option value="processes">进程资源占用</option>
+                <option value="service">系统服务状态</option>
+              </select>
+              <div id="serviceField" hidden>
+                <label for="service">服务名称</label
+                ><input
+                  id="service"
+                  name="service"
+                  placeholder="例如 nginx.service"
+                  maxlength="64"
+                  pattern="[A-Za-z0-9_.@-]+"
+                  autocomplete="off"
+                />
+                <p class="field-hint">
+                  输入 systemd 服务名，例如 mysqld 或 nginx.service
+                </p>
+              </div>
+              <button id="run" class="primary full" disabled>
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#terminal"></use>
+                </svg>
+                <span>开始诊断</span
+                ><svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#arrow"></use>
+                </svg>
+              </button>
+              <p
+                id="notice"
+                class="status"
+                role="status"
+                aria-live="polite"
+              ></p>
+            </form>
+            <div class="diagnosis-note">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#shield"></use></svg
+              ><span>通过专用 SSH 密钥连接，执行网关允许的只读查询。</span>
+            </div>
+            <a href="/inventory" class="text-link"
+              >管理主机与连接
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#arrow"></use></svg
+            ></a>
+          </section>
+          <section class="terminal-card">
+            <div class="terminal-header">
+              <span class="terminal-lights"><i></i><i></i><i></i></span
+              ><span id="terminalTitle">diagnostic / output</span
+              ><span id="resultBadge" class="badge terminal-badge"
+                >等待任务</span
+              >
+            </div>
+            <div class="terminal-toolbar">
+              <span id="resultMeta">执行结果将在这里显示</span>
+              <div>
+                <button id="rawToggle" class="terminal-button" disabled>
+                  JSON</button
+                ><button
+                  id="copyOutput"
+                  class="terminal-button"
+                  aria-label="复制诊断结果"
+                  disabled
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="/assets/icons.svg#copy"></use>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div id="outputEmpty" class="terminal-empty">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#terminal"></use>
+              </svg>
+              <h3>准备好，开始排查。</h3>
+              <p>选择一台主机和诊断项目，<br />查看服务器返回的实时数据。</p>
+              <span class="terminal-prompt"
+                ><b>›</b> waiting for a diagnostic request<span
+                  class="cursor"
+                ></span
+              ></span>
+            </div>
+            <pre id="output" tabindex="0" hidden></pre>
+            <div class="terminal-footer">
+              <span id="outputState"><span class="dot"></span> 等待连接</span
+              ><span>SSH · ED25519</span>
+            </div>
+          </section>
+        </div>
+        <section class="card history-card">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">RECENT ACTIVITY</div>
+              <h2>最近诊断</h2>
+            </div>
+            <button id="refreshRuns" class="text-button">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#refresh"></use>
+              </svg>
+              刷新记录
+            </button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>目标主机</th>
+                  <th>诊断项目</th>
+                  <th>时间</th>
+                  <th>耗时</th>
+                  <th>结果</th>
+                  <th><span class="sr-only">操作</span></th>
+                </tr>
+              </thead>
+              <tbody id="runs"></tbody>
+            </table>
+          </div>
+          <div id="runsEmpty" class="empty-state" hidden>
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/icons.svg#clock"></use>
+            </svg>
+            <h3>还没有诊断记录</h3>
+            <p>完成第一次诊断后，可在这里回看结果。</p>
+          </div>
+          <p id="runsStatus" class="status" role="status"></p>
+        </section>
+        <footer>
+          <span>Linux AI Diagnostic MCP</span
+          ><span>所有诊断操作均记录审计</span>
+        </footer>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

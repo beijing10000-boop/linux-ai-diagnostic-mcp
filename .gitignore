@@ -14,3 +14,6 @@ __pycache__/
 .ruff_cache/
 .coverage
 dist/
+
+node_modules/
+ui-artifacts/

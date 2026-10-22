@@ -1,3 +1,142 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>首次初始化 · Linux AI Diagnostic</title><link rel="stylesheet" href="/assets/style.css"><script src="/assets/setup.js" defer></script></head><body><main class="auth-page"><section class="card auth-card"><div class="eyebrow">Getting Started · 首次配置</div><h1>欢迎使用 Linux AI Diagnostic</h1><p class="muted">飞书登录、管理员授权和诊断配置全部从 Web 开始。</p><p class="notice">一次性初始化凭证只能在服务器本地使用 docker compose 读取。正式公网开放前，请使用 VPN 或限制访问源 IP 完成初始化。</p>
-<form id="setupForm"><label>一次性初始化凭证<input type="password" name="bootstrap_token" required autocomplete="off"></label><label>飞书 App ID<input name="app_id" placeholder="cli_..." required></label><label>飞书 App Secret<input type="password" name="app_secret" required></label><label>管理员 Open ID<input name="admin_open_id" placeholder="ou_..." required></label><label>公网 HTTPS 地址<input name="public_url" placeholder="https://diag.example.com" type="url" required></label><button class="full">完成首次初始化</button></form>
-<p id="setupStatus" class="status"></p><p id="loginLink" hidden><a href="/login">前往飞书登录 →</a></p><p class="footnote">无需手动编写 .env；系统生成的主密钥需由服务器安全保存并备份。</p></section></main></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>首次初始化 · Linux AI Diagnostic</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script src="/assets/setup.js" defer></script>
+  </head>
+  <body class="auth-body setup-body">
+    <main class="setup-layout">
+      <section class="setup-aside">
+        <a class="brand auth-brand" href="/"
+          ><span class="brand-mark"
+            ><svg class="icon" aria-hidden="true">
+              <use href="/assets/icons.svg#terminal"></use></svg></span
+          ><span>Linux AI<span class="brand-sub">DIAGNOSTIC MCP</span></span></a
+        >
+        <div>
+          <div class="eyebrow">LET’S GET STARTED</div>
+          <h1>
+            为你的运维，<br />准备一个好起点<span class="heading-dot">.</span>
+          </h1>
+          <p class="muted">一次配置，开始安全诊断。</p>
+          <ol class="setup-steps">
+            <li>
+              <span>01</span>
+              <div>
+                <strong>验证初始化凭证</strong>
+                <p>从服务器本地读取一次性 Token</p>
+              </div>
+            </li>
+            <li>
+              <span>02</span>
+              <div>
+                <strong>连接飞书应用</strong>
+                <p>配置应用凭据与管理员 Open ID</p>
+              </div>
+            </li>
+            <li>
+              <span>03</span>
+              <div>
+                <strong>登录并添加主机</strong>
+                <p>核验公钥，开始第一次诊断</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+        <small>所有业务配置均在 Web 中完成</small>
+      </section>
+      <section class="card setup-card">
+        <div class="eyebrow">INITIAL SETUP</div>
+        <h2>初始化工作空间</h2>
+        <p class="muted small">请准备好飞书应用信息与 HTTPS 访问地址。</p>
+        <form id="setupForm">
+          <label for="bootstrapToken">一次性初始化凭证</label
+          ><input
+            id="bootstrapToken"
+            name="bootstrap_token"
+            type="password"
+            required
+            minlength="20"
+            maxlength="200"
+            autocomplete="off"
+          />
+          <details class="help-details">
+            <summary>在哪里获取初始化凭证？</summary>
+            <pre>docker compose exec web cat /app/data/bootstrap.token</pre>
+          </details>
+          <div class="form-cols">
+            <div>
+              <label for="setupAppId">飞书 App ID</label
+              ><input
+                id="setupAppId"
+                name="app_id"
+                required
+                pattern="cli_[A-Za-z0-9]{8,80}"
+                placeholder="cli_…"
+              />
+            </div>
+            <div>
+              <label for="setupOpenId">管理员 Open ID</label
+              ><input
+                id="setupOpenId"
+                name="admin_open_id"
+                required
+                pattern="ou_[A-Za-z0-9_-]{8,150}"
+                placeholder="ou_…"
+              />
+            </div>
+          </div>
+          <label for="setupSecret">飞书 App Secret</label
+          ><input
+            id="setupSecret"
+            name="app_secret"
+            type="password"
+            required
+            minlength="10"
+            maxlength="300"
+            autocomplete="new-password"
+          /><label for="setupUrl">HTTPS 访问地址</label
+          ><input
+            id="setupUrl"
+            name="public_url"
+            type="url"
+            required
+            maxlength="300"
+            placeholder="https://diag.example.com"
+          />
+          <p class="field-hint">
+            填写域名与端口（如有），不含路径。Cookie 需要 HTTPS。
+          </p>
+          <div class="callback-box">
+            <span>在飞书后台添加此回调地址</span
+            ><code id="setupCallback"
+              >https://你的域名/auth/feishu/callback</code
+            >
+          </div>
+          <button class="primary full" type="submit">
+            完成初始化
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/icons.svg#arrow"></use>
+            </svg>
+          </button>
+        </form>
+        <p id="setupStatus" class="status" role="status" aria-live="polite"></p>
+        <p id="loginLink" hidden>
+          <a class="primary full" href="/login"
+            >前往飞书登录
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/icons.svg#arrow"></use></svg
+          ></a>
+        </p>
+        <p class="field-hint">
+          首次配置请通过受限 HTTPS 入口完成。成功后初始化凭证自动失效。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
