@@ -222,9 +222,10 @@ def update_settings(body: SettingsUpdate, request: Request):
         values["public_url"] = check_url(values["public_url"])
     mapping = {"app_id": "feishu_app_id", "app_secret": "feishu_app_secret",
                "admin_open_id": "admin_open_id", "public_url": "public_url"}
+    who = security.admin(request)
     for key, value in values.items():
         security.put(mapping[key], value)
-    security.audit(security.admin(request), "update_settings")
+    security.audit(who, "update_settings")
     if "admin_open_id" in values or "app_id" in values or "app_secret" in values:
         security.revoke_all_sessions()
     return {"ok": True, "reauth_required": bool(
