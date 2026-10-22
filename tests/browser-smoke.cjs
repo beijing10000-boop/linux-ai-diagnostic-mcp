@@ -1,13 +1,14 @@
-/* Real browser + real HTTPS API. The isolated server uses test SSH results only. */
+/* Real browser + real HTTP/HTTPS API. The isolated server uses test SSH results only. */
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const https = require("node:https");
+const protocol = process.env.DIAG_UI_PROTOCOL === "http" ? "http" : "https";
+const transport = require("node:" + protocol);
 const { spawn } = require("node:child_process");
 const { chromium } = require("playwright");
 const root = path.resolve(__dirname, ".."),
-  origin = "https://127.0.0.1:9443";
+  origin = `${protocol}://127.0.0.1:${protocol === "http" ? 9098 : 9443}`;
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), "diag-ui-run-"));
 const fixturePath = path.join(temp, "fixture.json");
 const artifacts =
@@ -15,7 +16,7 @@ const artifacts =
 fs.mkdirSync(artifacts, { recursive: true });
 const server = spawn(
   process.env.DIAG_PYTHON || path.join(root, ".venv/bin/python"),
-  ["-m", "tests.ui_server", fixturePath],
+  ["-m", "tests.ui_server", fixturePath, protocol],
   { cwd: root, stdio: ["ignore", "pipe", "pipe"] },
 );
 let serverLog = "",
@@ -25,15 +26,11 @@ server.stderr.on("data", (b) => (serverLog += b.toString()));
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function health() {
   return new Promise((resolve) => {
-    https
-      .get(
-        "https://127.0.0.1:9443/healthz",
-        { rejectUnauthorized: false },
-        (r) => {
-          r.resume();
-          resolve(r.statusCode === 200);
-        },
-      )
+    transport
+      .get(origin + "/healthz", { rejectUnauthorized: false }, (r) => {
+        r.resume();
+        resolve(r.statusCode === 200);
+      })
       .on("error", () => resolve(false));
   });
 }
@@ -119,6 +116,14 @@ async function checkOverflow(page) {
     });
     const page = await context.newPage(),
       errors = [];
+    if (protocol === "http") {
+      await page.addInitScript(() =>
+        Object.defineProperty(navigator, "clipboard", {
+          get: () => undefined,
+          configurable: true,
+        }),
+      );
+    }
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("console", (message) => {
       if (
@@ -158,7 +163,7 @@ async function checkOverflow(page) {
         value: fixture.session,
         domain: "127.0.0.1",
         path: "/",
-        secure: true,
+        secure: protocol === "https",
         httpOnly: true,
         sameSite: "Lax",
       },
@@ -257,6 +262,11 @@ async function checkOverflow(page) {
     await page.locator("#run").click();
     await waitText(page, "#resultBadge", "执行完成");
     await waitText(page, "#output", "load average");
+    if (protocol === "http") {
+      await page.locator("#copyOutput").click();
+      await waitText(page, "#toast", "已复制到剪贴板");
+      assert.equal(await page.locator(".clipboard-helper").count(), 0);
+    }
     await waitText(page, "#runs", "D3-WEB-01");
     await page.locator("#rawToggle").click();
     await waitText(page, "#output", '"exit_code"');

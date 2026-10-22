@@ -15,7 +15,7 @@ const Diag = {
     "Session expired": "登录已过期，请重新登录",
     "Administrator required": "此账号没有管理员权限",
     "Invalid CSRF token": "安全凭证已失效，请刷新页面后重试",
-    "Origin mismatch": "访问地址与系统配置不一致，请从配置的 HTTPS 地址登录",
+    "Origin mismatch": "访问地址与系统配置不一致，请从系统配置的访问地址登录",
     "Unrecognized Host": "当前域名与系统配置不一致",
     "Duplicate group": "主机组名称已存在",
     "Duplicate proxy": "代理名称已存在",
@@ -60,8 +60,8 @@ const Diag = {
       "当前诊断任务较多，请稍后重试",
     "Diagnostic execution failed": "诊断执行失败，请查看服务日志与安全审计",
     "Rate limit exceeded": "操作过于频繁，请稍后重试",
-    "Public URL must be a valid HTTPS origin":
-      "访问地址必须是 HTTPS 域名，可含端口，不应包含路径或查询参数",
+    "Use an HTTPS origin or an HTTP private IP origin":
+      "访问地址可用 HTTPS，或内网 IP 的 HTTP 地址；可含端口，不含路径和查询参数",
     "Already initialized": "系统已完成初始化，请前往登录页",
     "Invalid bootstrap token":
       "初始化凭证无效，请从服务器读取正确的一次性 Token",
@@ -78,7 +78,7 @@ const Diag = {
         app_id: "App ID",
         admin_open_id: "管理员 Open ID",
         app_secret: "App Secret",
-        public_url: "HTTPS 地址",
+        public_url: "访问地址",
         bootstrap_token: "初始化凭证",
         service: "服务名",
         username: "SSH 用户名",
@@ -210,11 +210,26 @@ const Diag = {
     return ms < 1000 ? ms + " ms" : (ms / 1000).toFixed(1) + " s";
   },
   async copy(value) {
+    const focused = document.activeElement;
+    let helper;
     try {
-      await navigator.clipboard.writeText(value);
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        helper = document.createElement("textarea");
+        helper.value = value;
+        helper.className = "clipboard-helper";
+        helper.setAttribute("readonly", "");
+        document.body.append(helper);
+        helper.select();
+        if (!document.execCommand("copy")) throw Error("Clipboard unavailable");
+      }
       this.toast("已复制到剪贴板");
     } catch (_) {
-      this.toast("复制失败，请在 HTTPS 页面中使用复制功能", true);
+      this.toast("复制未完成，请手动选择结果文本复制", true);
+    } finally {
+      helper?.remove();
+      focused?.focus({ preventScroll: true });
     }
   },
 };

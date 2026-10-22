@@ -53,7 +53,7 @@
       <section class="card setup-card">
         <div class="eyebrow">INITIAL SETUP</div>
         <h2>初始化工作空间</h2>
-        <p class="muted small">请准备好飞书应用信息与 HTTPS 访问地址。</p>
+        <p class="muted small">请准备好飞书应用信息与 访问地址。</p>
         <form id="setupForm">
           <label for="bootstrapToken">一次性初始化凭证</label
           ><input
@@ -100,17 +100,17 @@
             minlength="10"
             maxlength="300"
             autocomplete="new-password"
-          /><label for="setupUrl">HTTPS 访问地址</label
+          /><label for="setupUrl">访问地址</label
           ><input
             id="setupUrl"
             name="public_url"
             type="url"
             required
             maxlength="300"
-            placeholder="https://diag.example.com"
+            placeholder="http://172.20.200.100:9099"
           />
           <p class="field-hint">
-            填写域名与端口（如有），不含路径。Cookie 需要 HTTPS。
+            内网可填写 http://内网IP:9099；HTTPS 可填写域名。不含路径。
           </p>
           <div class="callback-box">
             <span>在飞书后台添加此回调地址</span
@@ -134,7 +134,7 @@
           ></a>
         </p>
         <p class="field-hint">
-          首次配置请通过受限 HTTPS 入口完成。成功后初始化凭证自动失效。
+          首次配置可通过内网 HTTP 或 HTTPS 完成。成功后初始化凭证自动失效。
         </p>
       </section>
     </main>

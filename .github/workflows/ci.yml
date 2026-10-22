@@ -53,6 +53,12 @@ jobs:
         run: npm run test:ui
         env:
           DIAG_PYTHON: python
+      - name: Browser regression against LAN HTTP fixture
+        run: npm run test:ui
+        env:
+          DIAG_PYTHON: python
+          DIAG_UI_PROTOCOL: http
+          DIAG_UI_ARTIFACTS: ui-artifacts/http
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -71,7 +77,9 @@ jobs:
           sudo chown 10001:10001 data
           sudo chmod 700 data
       - name: Verify Compose
-        run: docker compose config --quiet
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.lan.yaml config --quiet
       - name: Start development container
         run: docker compose up -d --build
       - name: Check port 9099 and one-time bootstrap

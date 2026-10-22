@@ -44,7 +44,7 @@ app.mount("/assets", StaticFiles(directory=WEB / "assets"), name="assets")
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
-    # HTTPS reverse proxy must preserve Host and reject unknown hosts at the edge.
+    # Match the configured origin for both LAN HTTP and HTTPS deployments.
     if (
         request.url.path != "/healthz"
         and security.storage.DB.exists()
@@ -64,7 +64,13 @@ async def security_headers(request: Request, call_next):
         "connect-src 'self'; img-src 'self' data:; font-src 'self'; "
         "form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
     )
-    response.headers["Strict-Transport-Security"] = "max-age=31536000"
+    use_https = (
+        security.secure_cookie()
+        if security.configured()
+        else request.url.scheme == "https"
+    )
+    if use_https:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -82,7 +88,7 @@ def check_url(raw: str) -> str:
     try:
         u = urlsplit(raw)
         if (
-            u.scheme != "https"
+            u.scheme not in ("http", "https")
             or not u.hostname
             or u.username
             or u.password
@@ -96,21 +102,36 @@ def check_url(raw: str) -> str:
         try:
             ip = ipaddress.ip_address(host)
         except ValueError:
-            if host == "localhost" or not all(
+            if (host == "localhost" and u.scheme != "http") or not all(
                 re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", part)
                 for part in host.split(".")
             ):
                 raise ValueError()
         else:
-            if ip.is_loopback or ip.is_unspecified or ip.is_multicast:
+            if (
+                (ip.is_loopback and u.scheme != "http")
+                or ip.is_unspecified
+                or ip.is_multicast
+                or getattr(ip, "scope_id", None)
+            ):
                 raise ValueError()
             host = f"[{ip}]" if ip.version == 6 else str(ip)
+        if u.scheme == "http" and host != "localhost":
+            http_ip = ipaddress.ip_address(u.hostname)
+            if not http_ip.is_loopback:
+                inventory.validate_address(str(http_ip))
         port = u.port
         if port is not None and not 1 <= port <= 65535:
             raise ValueError()
-        return "https://" + host + (f":{port}" if port and port != 443 else "")
+        default_port = 443 if u.scheme == "https" else 80
+        return (
+            u.scheme
+            + "://"
+            + host
+            + (f":{port}" if port and port != default_port else "")
+        )
     except (ValueError, UnicodeError):
-        raise HTTPException(400, "Public URL must be a valid HTTPS origin")
+        raise HTTPException(400, "Use an HTTPS origin or an HTTP private IP origin")
 
 
 @app.exception_handler(RequestValidationError)
@@ -262,7 +283,7 @@ def feishu_start(request: Request):
         nonce,
         max_age=300,
         httponly=True,
-        secure=True,
+        secure=security.secure_cookie(),
         samesite="lax",
         path="/auth/feishu/callback",
     )
@@ -337,7 +358,7 @@ async def feishu_callback(
         "diag_session",
         token,
         httponly=True,
-        secure=True,
+        secure=security.secure_cookie(),
         samesite="lax",
         max_age=security.SESSION_TTL,
         path="/",

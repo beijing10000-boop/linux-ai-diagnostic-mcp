@@ -20,6 +20,22 @@
 | 公网 MCP HTTP、SFTP、任意 Shell | 明确禁用 |
 | 诊断审计、CSRF、Host / Origin 校验 | 已实现基础防护 |
 
+## 内网 HTTP 安装
+
+在私有网络中可直接使用 `http://服务器内网IP:9099`。无需 Nginx 或证书，飞书管理员登录、CSRF、Host 校验和命令白名单继续生效。
+
+```bash
+mkdir -p data
+sudo chown 10001:10001 data
+sudo chmod 700 data
+docker compose -f compose.lan.yaml up -d --build
+docker compose -f compose.lan.yaml exec web cat /app/data/bootstrap.token
+```
+
+浏览器打开 `http://服务器内网IP:9099`，初始化时“访问地址”填写相同地址。飞书开发者后台的重定向 URL 填写 `http://服务器内网IP:9099/auth/feishu/callback`。浏览器必须能访问该内网地址，服务器仍需出网访问飞书 HTTPS 接口。
+
+`compose.lan.yaml` 是独立配置文件，发布 `0.0.0.0:9099`；网络边界只向内网放行该端口。HTTP 不加密传输，仅用于受信任内网。访问地址支持 RFC1918 IPv4、IPv6 ULA 与本机回环地址；公网访问使用 HTTPS。
+
 ## 本机内测
 
 ```bash

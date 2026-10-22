@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — 内网 HTTP 部署
+
+- 新增独立 `compose.lan.yaml`，支持内网 IP:9099 直接访问。
+- 初始化与访问地址支持私有 IP 的 HTTP；Cookie 根据配置协议选择 Secure，HTTP 不发送 HSTS。
+- HTTP 同样保留飞书管理员登录、OAuth state、Host、Origin 与 CSRF 校验。
+- 复制功能增加内网 HTTP 兼容实现；新增 HTTP 登录、写操作与协议迁移回归。
+- 桌面浏览器分别验证 HTTP/HTTPS 流程，更新部署与飞书回调说明。
+
 ## Unreleased — 功能修复与控制台改造
 
 - 重做诊断工作台、资产管理、设置、初始化与飞书登录页面，统一导航、桌面布局与深浅色。

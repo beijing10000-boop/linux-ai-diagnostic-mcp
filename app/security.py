@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import secrets
 import time
+from urllib.parse import urlsplit
 from fastapi import HTTPException, Request
 from . import storage
 
@@ -177,6 +178,11 @@ def csrf_token(request: Request) -> str:
     return hmac.new(
         storage.key(), ("csrf:" + cookie).encode(), hashlib.sha256
     ).hexdigest()
+
+
+def secure_cookie() -> bool:
+    """Use the persisted scheme, never untrusted forwarding headers."""
+    return urlsplit(get("public_url") or "").scheme == "https"
 
 
 def csrf_guard(request: Request) -> None:

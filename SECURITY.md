@@ -3,7 +3,7 @@
 本项目涉及 root SSH 诊断。**root 不具有真正的只读权限**，通过 authorized_keys 强制命令网关来收窄这把专用公钥的操作能力。
 
 ## v0.1.0 已实施
-- 飞书管理员 Open ID 授权、会话服务端存储、HttpOnly Secure Cookie。
+- 飞书管理员 Open ID 授权、会话服务端存储、HttpOnly/SameSite Cookie；HTTPS 下启用 Secure，受信任内网 HTTP 下不启用 Secure。
 - 浏览器绑定 OAuth state；管理操作 CSRF Token + Origin；公网 Host 检查。
 - 管理接口不提供未经认证的诊断调用；MCP 只开放本地 stdio 入口。
 - 私有 IP 目标、单独 SSH Ed25519 私钥、公钥固定、固定动作白名单。
@@ -23,3 +23,7 @@
 
 ## 安全报告
 请通过 GitHub 私有漏洞报告或向仓库维护者私下提交问题，切勿在公开 issue 粘贴真实私钥、会话 Cookie、飞书 Secret 或生产主机列表。
+
+## 内网 HTTP 模式
+
+`compose.lan.yaml` 允许内网浏览器通过 IP:9099 访问；HTTP 访问地址仅接受 RFC1918 IPv4、IPv6 ULA 或回环地址。此模式保留认证、CSRF、Origin、Host、网关白名单与凭据加密存储，但传输本身不加密，网络层应限制为受信任内网。HTTPS 配置仍启用 Secure Cookie 与 HSTS，不信任客户端提交的 X-Forwarded-Proto 来决定 Cookie 标志。

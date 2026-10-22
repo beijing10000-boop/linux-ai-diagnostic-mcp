@@ -2249,3 +2249,11 @@ textarea {
     font-size: 10px;
   }
 }
+
+.clipboard-helper {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+}

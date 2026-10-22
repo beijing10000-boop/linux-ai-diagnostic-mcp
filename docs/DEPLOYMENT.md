@@ -2,12 +2,33 @@
 
 ## 前提
 - Linux + Docker Engine / Docker Compose
-- 测试域名与可信 HTTPS 反向代理（建议先在 VPN 内使用）
+- 内网 HTTP 使用服务器私有 IP；公网 HTTPS 使用域名与反向代理
 - 飞书自建应用的 App ID、App Secret 和管理员 Open ID
 - 目标主机 sshd 与 Python 3（`/usr/bin/python3`）
 
+## 内网 HTTP（当前部署方式）
+
+选择独立的 LAN 配置启动，不需要反向代理或证书：
+
+```bash
+mkdir -p data
+sudo chown 10001:10001 data
+sudo chmod 700 data
+docker compose -f compose.lan.yaml up -d --build
+docker compose -f compose.lan.yaml ps
+docker compose -f compose.lan.yaml exec web cat /app/data/bootstrap.token
+```
+
+浏览器访问 `http://服务器内网IP:9099`。初始化填写同一访问地址、飞书应用凭据与管理员 Open ID；飞书安全设置添加精确回调 `http://服务器内网IP:9099/auth/feishu/callback`。
+
+此配置发布 `0.0.0.0:9099`，网络上仅向受信任内网开放。HTTP 不加密传输。管理员会话与 OAuth 临时 Cookie 在 HTTP 下不设 Secure、保留 HttpOnly/SameSite=Lax；HTTPS 下恢复 Secure。Host、Origin、CSRF、管理员校验与 SSH 网关限制保持启用。
+
+浏览器需可达该内网 IP；服务器需能访问 `open.feishu.cn:443` 的接口。回调由浏览器跳转完成，服务无需公网入站。复制功能在 HTTP 下自动使用兼容实现。
+
+已有配置从 HTTPS 切换到 HTTP 时，应先在“系统设置”修改访问地址；变更会注销原会话。不要删除数据库或主密钥。
+
 ## 默认端口
-Web 容器监听 **9099/TCP**；Docker Compose 只发布在 **127.0.0.1:9099**，请勿改为 `0.0.0.0:9099` 直接暴露公网。
+Web 容器监听 **9099/TCP**。`compose.lan.yaml` 用于内网直连，发布 `0.0.0.0:9099`；默认 `compose.yaml` 仅发布 `127.0.0.1:9099`，用于 HTTPS 反向代理。后续日志、更新和重启请使用与启动相同的配置文件。
 
 ## 初始化
 ```bash

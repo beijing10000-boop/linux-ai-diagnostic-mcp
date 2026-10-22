@@ -3,6 +3,9 @@
   const form = document.getElementById("setupForm"),
     status = document.getElementById("setupStatus"),
     url = document.getElementById("setupUrl");
+  url.value = location.origin;
+  document.getElementById("setupCallback").textContent =
+    location.origin + "/auth/feishu/callback";
   url.addEventListener("input", () => {
     document.getElementById("setupCallback").textContent =
       (url.value.trim().replace(/\/$/, "") || "https://你的域名") +
@@ -33,8 +36,8 @@
           "Invalid bootstrap token":
             "一次性初始化凭证不正确，请从服务器重新核对",
           "Already initialized": "系统已经初始化，请前往登录",
-          "Public URL must be a valid HTTPS origin":
-            "请填写不含路径的有效 HTTPS 访问地址",
+          "Use an HTTPS origin or an HTTP private IP origin":
+            "请填写 HTTPS 地址或 http://内网IP:端口，不含路径",
           "Rate limit exceeded": "操作过于频繁，请稍后再试",
         };
         throw Error(

@@ -16,6 +16,7 @@ from cryptography.x509.oid import NameOID
 
 
 def main():
+    use_http = len(sys.argv) > 2 and sys.argv[2] == "http"
     with tempfile.TemporaryDirectory(prefix="diag-ui-") as directory:
         data = Path(directory)
         os.environ["DIAG_DATA_DIR"] = directory
@@ -108,9 +109,9 @@ def main():
         uvicorn.run(
             app,
             host="127.0.0.1",
-            port=9443,
-            ssl_keyfile=str(key_path),
-            ssl_certfile=str(cert_path),
+            port=9098 if use_http else 9443,
+            ssl_keyfile=None if use_http else str(key_path),
+            ssl_certfile=None if use_http else str(cert_path),
             proxy_headers=False,
             log_level="warning",
         )
