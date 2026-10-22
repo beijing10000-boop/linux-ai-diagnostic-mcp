@@ -1,0 +1,34 @@
+#!/usr/bin/python3
+import os
+import re
+import subprocess
+import sys
+COMMANDS = {
+    "cpu": ["/usr/bin/uptime"],
+    "memory": ["/usr/bin/free", "-m"],
+    "disk": ["/usr/bin/df", "-hT"],
+    "network": ["/usr/sbin/ip", "-s", "link"],
+    "sockets": ["/usr/bin/ss", "-s"],
+    "processes": ["/usr/bin/ps", "-eo", "pid,ppid,user,stat,pcpu,pmem,comm", "--sort=-pcpu"],
+}
+def main():
+    raw = os.environ.get("SSH_ORIGINAL_COMMAND", "")
+    if len(raw) > 128:
+        sys.exit(2)
+    parts = raw.split(" ")
+    if len(parts) == 1 and parts[0] in COMMANDS:
+        args = COMMANDS[parts[0]]
+    elif len(parts) == 2 and parts[0] == "service" and re.fullmatch(r"[A-Za-z0-9_.@-]{1,64}", parts[1]) and not parts[1].startswith("-"):
+        args = ["/usr/bin/systemctl", "--no-pager", "is-active", parts[1]]
+    else:
+        print("Denied", file=sys.stderr)
+        sys.exit(2)
+    try:
+        p = subprocess.run(args, stdin=subprocess.DEVNULL, capture_output=True, timeout=10, env={"PATH":"/usr/bin:/usr/sbin:/bin"})
+        sys.stdout.buffer.write(p.stdout[:32768])
+        sys.stderr.buffer.write(p.stderr[:2048])
+        sys.exit(p.returncode)
+    except subprocess.TimeoutExpired:
+        sys.exit(124)
+if __name__ == "__main__":
+    main()
