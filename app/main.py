@@ -1,5 +1,4 @@
 """Web control plane; public routes are explicitly limited."""
-import ipaddress
 import logging
 import secrets
 import sqlite3
