@@ -1,5 +1,4 @@
 from urllib.parse import parse_qs, urlsplit
-import pytest
 from app import security, storage
 from .conftest import APP_ID, OPEN_ID, PUBLIC_URL
 
