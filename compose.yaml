@@ -1,0 +1,12 @@
+services:
+  web:
+    build: .
+    ports:
+      - "127.0.0.1:8088:8088"
+    env_file: .env
+    volumes:
+      - ./secrets/diagnostic_key:/run/secrets/diagnostic_key:ro
+      - ./secrets/known_hosts:/app/known_hosts:ro
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
