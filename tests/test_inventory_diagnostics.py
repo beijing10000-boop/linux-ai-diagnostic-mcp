@@ -10,12 +10,14 @@ def valid_host_key():
 def test_injection_rejected():
     for action,service in [("cpu; reboot",None),("service","nginx;reboot"),("service","--help"),
                            ("service","x\\ny"),("disk","extra"),("cat /etc/shadow",None)]:
-        with pytest.raises(ValueError): diagnostics.validate(action,service)
+        with pytest.raises(ValueError):
+            diagnostics.validate(action,service)
     assert diagnostics.validate("service","nginx.service")=="service nginx.service"
 
 def test_private_ip_only():
     for host in ("127.0.0.1","8.8.8.8","169.254.10.20","0.0.0.0","224.1.2.3"):
-        with pytest.raises(ValueError):inventory.validate_address(host)
+        with pytest.raises(ValueError):
+            inventory.validate_address(host)
     assert inventory.validate_address("172.20.1.10")=="172.20.1.10"
 
 def test_host_restrictions(authorized):
@@ -33,8 +35,10 @@ def test_host_restrictions(authorized):
        json={"host_id":host_id,"action":"cpu;id"}).status_code==400
 
 def test_key_pinning_validation():
-    with pytest.raises(ValueError): inventory.validate_host_key("ssh-rsa AAAA")
-    with pytest.raises(ValueError): inventory.validate_host_key("ssh-ed25519 AAAA")
+    with pytest.raises(ValueError):
+        inventory.validate_host_key("ssh-rsa AAAA")
+    with pytest.raises(ValueError):
+        inventory.validate_host_key("ssh-ed25519 AAAA")
     assert inventory.validate_host_key(valid_host_key()).startswith("ssh-ed25519 ")
 
 def test_proxy_not_executed(authorized):
