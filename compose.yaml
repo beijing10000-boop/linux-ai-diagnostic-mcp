@@ -4,9 +4,12 @@ services:
     ports:
       - "127.0.0.1:8088:8088"
     env_file: .env
+    environment:
+      DIAG_DB_PATH: /app/data/inventory.db
     volumes:
       - ./secrets/diagnostic_key:/run/secrets/diagnostic_key:ro
       - ./secrets/known_hosts:/app/known_hosts:ro
+      - ./data:/app/data
     read_only: true
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]
