@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>连接调试 · Linux AI Diagnostic</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script defer src="/assets/common.js"></script>
+    <script defer src="/assets/connections.js"></script>
+  </head>
+  <body data-page="connections">
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <aside class="sidebar" id="appSidebar" aria-label="工作空间导航"></aside>
+    <div class="workspace">
+      <header class="topbar" id="appHeader"></header>
+      <main class="container" id="main">
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>平台配置检查</h2>
+              <p class="sub">
+                核验数据存储、访问配置与 SSH 凭据准备情况，不发起远程操作。
+              </p>
+            </div>
+            <button id="checkPlatform" class="secondary">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#refresh"></use>
+              </svg>
+              检查平台配置
+            </button>
+          </div>
+          <div id="connectionReadiness" class="readiness-grid"></div>
+          <pre id="platformOutput" class="result-output">正在读取平台状态…</pre>
+          <p id="platformStatus" class="status" role="status"></p>
+        </section>
+        <section class="card">
+          <h2>SSH 与网关调试</h2>
+          <p class="sub">
+            选择目标主机，执行一次固定的 CPU 负载查询，验证 SSH
+            身份、代理路径和命令网关。
+          </p>
+          <form id="connectionForm">
+            <div class="form-cols">
+              <div>
+                <label for="testHost">目标主机</label
+                ><select id="testHost" required>
+                  <option value="">正在读取主机…</option>
+                </select>
+              </div>
+              <div class="field-summary">
+                <strong>本次检查</strong>
+                <p class="sub" id="testHostHint">先选择需要验证的主机。</p>
+              </div>
+            </div>
+            <div class="actions">
+              <button
+                id="testConnection"
+                type="submit"
+                class="primary"
+                disabled
+              >
+                测试 SSH 与网关</button
+              ><a id="openDiagnostics" class="secondary" href="/diagnostics"
+                >打开只读诊断台</a
+              ><a class="secondary" href="/inventory">管理连接配置</a>
+            </div>
+            <p class="field-hint">
+              此检查执行只读查询，并会写入诊断历史和审计。关联代理的主机通过其跳板连接，不会回退直连。
+            </p>
+            <p id="connectionStatus" class="status" role="status"></p>
+          </form>
+          <pre id="connectionOutput" class="result-output">
+请选择一台主机开始检查。</pre>
+        </section>
+        <section class="card">
+          <h2>MCP 接入方式</h2>
+          <p class="sub">
+            当前提供本地 stdio 工具，供可信 AI 服务进程调用。9099
+            是管理页面与受认证的诊断 API。
+          </p>
+          <pre class="result-output">
+docker compose -f compose.lan.yaml exec -T web python -m app.mcp_server</pre>
+          <p class="field-hint">
+            可用工具：list_linux_hosts、diagnose_linux_host。仅向模型开放固定查询动作。
+          </p>
+        </section>
+        <footer>
+          <span>Linux AI Diagnostic · 只读诊断平台</span
+          ><span>所有诊断操作均记录审计</span>
+        </footer>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

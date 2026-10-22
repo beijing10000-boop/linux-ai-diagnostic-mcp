@@ -273,3 +273,80 @@ def get_run(row_id: int) -> dict | None:
     record = dict(row)
     record["result"] = json.loads(storage.decrypt(record["result"]))
     return record
+
+
+def run_page(
+    page: int = 1, page_size: int = 20, status: str = "all", query: str = ""
+) -> dict:
+    """Return encrypted-result metadata only; decrypt a result on explicit detail access."""
+    clauses, values = [], []
+    if status != "all":
+        clauses.append("status=?")
+        values.append(status)
+    if query:
+        clauses.append("instr(lower(host_name),lower(?))>0")
+        values.append(query.strip())
+    where = " WHERE " + " AND ".join(clauses) if clauses else ""
+    with storage.connect() as c:
+        total = c.execute(
+            "SELECT COUNT(*) FROM diagnostic_runs" + where, values
+        ).fetchone()[0]
+        rows = c.execute(
+            """SELECT id,host_id,host_name,action,service,time,duration_ms,status
+            FROM diagnostic_runs"""
+            + where
+            + " ORDER BY id DESC LIMIT ? OFFSET ?",
+            (*values, page_size, (page - 1) * page_size),
+        ).fetchall()
+    return {
+        "items": [dict(row) for row in rows],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+def overview() -> dict:
+    with storage.connect() as c:
+        counts = {
+            row["status"]: row["amount"]
+            for row in c.execute(
+                "SELECT status,COUNT(*) AS amount FROM diagnostic_runs GROUP BY status"
+            )
+        }
+        last_run = c.execute("SELECT MAX(time) FROM diagnostic_runs").fetchone()[0]
+        groups = c.execute("SELECT COUNT(*) FROM host_groups").fetchone()[0]
+    hosts, proxies = inventory.list_rows("hosts"), inventory.list_rows("proxies")
+    ready_proxies = {p["id"] for p in proxies if p["status"] == "configured"}
+    configured_hosts = sum(
+        bool(h["host_key"])
+        and (h["proxy_id"] is None or h["proxy_id"] in ready_proxies)
+        for h in hosts
+    )
+    return {
+        "database": "ok",
+        "ssh_configured": bool(security.get("ssh_private_key")),
+        "inventory": {
+            "hosts": len(hosts),
+            "groups": groups,
+            "proxies": len(proxies),
+            "configured_proxies": len(ready_proxies),
+            "configured_hosts": configured_hosts,
+        },
+        "runs": {
+            "total": sum(counts.values()),
+            "success": counts.get("success", 0),
+            "warning": counts.get("warning", 0),
+            "failed": counts.get("failed", 0),
+            "last_run": last_run,
+        },
+    }
+
+
+def public_key_info() -> dict:
+    raw = security.get("ssh_private_key")
+    if not raw:
+        return {"ssh_public_key": "", "ssh_fingerprint": ""}
+    key = validate_private_key(raw, security.get("ssh_key_passphrase"))
+    public = key.get_name() + " " + key.get_base64()
+    return {"ssh_public_key": public, "ssh_fingerprint": inventory.fingerprint(public)}

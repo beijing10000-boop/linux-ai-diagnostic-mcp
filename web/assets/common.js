@@ -95,6 +95,138 @@ const Diag = {
       (typeof detail === "string" ? detail : `请求失败（HTTP ${status}）`)
     );
   },
+  shell() {
+    const sidebar = document.getElementById("appSidebar"),
+      header = document.getElementById("appHeader");
+    if (!sidebar || !header) return;
+    const pages = [
+      ["overview", "/", "grid", "总览仪表盘"],
+      ["settings", "/settings", "settings", "系统配置"],
+      ["inventory", "/inventory", "server", "主机与代理"],
+      ["connections", "/connections", "route", "连接调试"],
+      ["diagnostics", "/diagnostics", "terminal", "只读诊断台"],
+      ["activity", "/activity", "clock", "任务与审计"],
+    ];
+    const current =
+      pages.find((p) => p[0] === document.body.dataset.page) || pages[0];
+    sidebar.innerHTML =
+      '<a class="brand" href="/"><span class="brand-mark">L</span><span><strong>Linux AI Diagnostic</strong><span class="brand-sub">READ-ONLY OPERATIONS</span></span></a><nav class="nav" aria-label="主导航"></nav><div class="side-foot">Linux AI Diagnostic · 管理控制台<br><span data-version>版本加载中…</span> · 端口 9099</div>';
+    for (const [id, href, icon, label] of pages) {
+      const link = this.node(
+        "a",
+        "",
+        "nav-item" + (id === current[0] ? " active" : ""),
+      );
+      link.href = href;
+      if (id === current[0]) link.setAttribute("aria-current", "page");
+      link.append(this.icon(icon), this.node("span", label));
+      sidebar.querySelector("nav").append(link);
+    }
+    header.innerHTML =
+      '<div><h1 id="pagetitle"></h1><div class="sub">Linux 只读诊断 · SSH 网关 · 飞书身份验证</div></div><div class="user-area"><span id="accessMode" class="protocol-label"></span><span class="session-pill" id="sessionState">正在验证</span><span class="avatar">A</span><span id="username" class="username">管理员</span><button class="secondary danger" data-logout>退出</button></div>';
+    header.querySelector("h1").textContent = current[3];
+  },
+  renderReadiness(target, data) {
+    target.replaceChildren();
+    const items = [
+      [
+        "数据库",
+        data.database === "ok",
+        "平台配置与诊断记录存储",
+        "/activity",
+        "查看任务",
+      ],
+      [
+        "SSH 凭据",
+        data.ssh_configured,
+        data.ssh_configured
+          ? "诊断专用私钥已保存"
+          : "先保存有效的 Ed25519 私钥",
+        "/settings#ssh",
+        "配置凭据",
+      ],
+      [
+        "主机连接配置",
+        data.inventory.hosts > 0 &&
+          data.inventory.configured_hosts === data.inventory.hosts,
+        `${data.inventory.configured_hosts} / ${data.inventory.hosts} 台主机配置完整`,
+        "/inventory",
+        "管理主机",
+      ],
+      [
+        "首次诊断验证",
+        data.runs.success > 0,
+        data.runs.success
+          ? `${data.runs.success} 次查询执行完成`
+          : "先在测试主机完成一次查询",
+        "/connections",
+        "连接调试",
+      ],
+    ];
+    for (const [title, ok, text, href, label] of items) {
+      const card = this.node("div", "", "readiness-item");
+      card.append(
+        this.node("strong", title),
+        this.node(
+          "span",
+          ok ? "已准备" : "待完成",
+          "badge " + (ok ? "success" : "warning"),
+        ),
+        this.node("p", text, "sub"),
+      );
+      const link = this.node("a", label + " →");
+      link.href = href;
+      card.append(link);
+      target.append(card);
+    }
+  },
+  statusBadge(status) {
+    return this.node(
+      "span",
+      { success: "执行完成", warning: "需要关注", failed: "执行失败" }[
+        status
+      ] || status,
+      "badge " + status,
+    );
+  },
+  resultText(result) {
+    if (result.error) return this.errorMessage(result.error);
+    return (
+      (result.output || "（无标准输出）") +
+      (result.stderr ? "\n\n── 标准错误 ──\n" + result.stderr : "") +
+      (result.truncated ? "\n\n[输出超过限制，已保留部分结果]" : "")
+    );
+  },
+  auditName(value) {
+    if (value === "login:unauthorized") return "飞书登录被拒绝（非管理员）";
+    const names = {
+      login: "飞书登录",
+      update_settings: "修改系统配置",
+      rotate_ssh_credential: "更新 SSH 凭据",
+      create_host: "添加主机",
+      update_host: "编辑主机",
+      delete_host: "删除主机",
+      create_group: "添加主机组",
+      update_group: "编辑主机组",
+      delete_group: "删除主机组",
+      create_proxy: "添加代理",
+      update_proxy: "编辑代理",
+      delete_proxy: "删除代理",
+    };
+    const parts = value.split(":");
+    if (parts[0] === "diagnose")
+      return (
+        "诊断主机 #" +
+        parts[1] +
+        " · " +
+        (this.actionNames[parts[2]] || parts[2]) +
+        " · " +
+        ({ success: "完成", warning: "需关注", failed: "失败", ok: "完成" }[
+          parts[3]
+        ] || parts[3])
+      );
+    return (names[parts[0]] || parts[0]) + (parts[1] ? " · #" + parts[1] : "");
+  },
   async init() {
     const response = await fetch("/api/me", {
       credentials: "same-origin",
@@ -107,6 +239,15 @@ const Diag = {
     if (!response.ok) throw Error("无法验证管理员登录，请稍后刷新");
     const data = await response.json();
     this.csrf = data.csrf_token;
+    const session = document.getElementById("sessionState");
+    if (session) session.textContent = "● 已验证登录";
+    const mode = document.getElementById("accessMode");
+    if (mode)
+      mode.textContent =
+        data.access_protocol === "http" ? "内网 HTTP" : "HTTPS";
+    const username = document.getElementById("username");
+    if (username) username.title = data.open_id;
+
     document
       .querySelectorAll("[data-version]")
       .forEach((n) => (n.textContent = "v" + data.version));
@@ -198,6 +339,7 @@ const Diag = {
   },
   date(time) {
     return new Date(time * 1000).toLocaleString("zh-CN", {
+      timeZone: "Asia/Shanghai",
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
@@ -220,7 +362,7 @@ const Diag = {
         helper.value = value;
         helper.className = "clipboard-helper";
         helper.setAttribute("readonly", "");
-        document.body.append(helper);
+        (focused?.closest("dialog[open]") || document.body).append(helper);
         helper.select();
         if (!document.execCommand("copy")) throw Error("Clipboard unavailable");
       }
@@ -234,6 +376,7 @@ const Diag = {
   },
 };
 window.Diag = Diag;
+Diag.shell();
 Diag.ready = Diag.init();
 Diag.ready.catch((e) => {
   Diag.message("status", e.message, true);

@@ -4,56 +4,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <title>首次初始化 · Linux AI Diagnostic</title>
+    <title>系统初始化 · Linux AI Diagnostic</title>
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <link rel="stylesheet" href="/assets/style.css" />
-    <script src="/assets/setup.js" defer></script>
+    <script defer src="/assets/setup.js"></script>
   </head>
-  <body class="auth-body setup-body">
-    <main class="setup-layout">
-      <section class="setup-aside">
-        <a class="brand auth-brand" href="/"
-          ><span class="brand-mark"
-            ><svg class="icon" aria-hidden="true">
-              <use href="/assets/icons.svg#terminal"></use></svg></span
-          ><span>Linux AI<span class="brand-sub">DIAGNOSTIC MCP</span></span></a
-        >
-        <div>
-          <div class="eyebrow">LET’S GET STARTED</div>
-          <h1>
-            为你的运维，<br />准备一个好起点<span class="heading-dot">.</span>
-          </h1>
-          <p class="muted">一次配置，开始安全诊断。</p>
-          <ol class="setup-steps">
-            <li>
-              <span>01</span>
-              <div>
-                <strong>验证初始化凭证</strong>
-                <p>从服务器本地读取一次性 Token</p>
-              </div>
-            </li>
-            <li>
-              <span>02</span>
-              <div>
-                <strong>连接飞书应用</strong>
-                <p>配置应用凭据与管理员 Open ID</p>
-              </div>
-            </li>
-            <li>
-              <span>03</span>
-              <div>
-                <strong>登录并添加主机</strong>
-                <p>核验公钥，开始第一次诊断</p>
-              </div>
-            </li>
-          </ol>
-        </div>
-        <small>所有业务配置均在 Web 中完成</small>
-      </section>
+  <body class="setup-body">
+    <main class="setup-screen">
       <section class="card setup-card">
-        <div class="eyebrow">INITIAL SETUP</div>
-        <h2>初始化工作空间</h2>
-        <p class="muted small">请准备好飞书应用信息与 访问地址。</p>
+        <div class="login-logo small-logo">L</div>
+        <h1>Linux AI Diagnostic 初始化</h1>
+        <p class="sub">
+          填写飞书应用与管理员信息，所有业务配置均在 Web 中管理。
+        </p>
         <form id="setupForm">
           <label for="bootstrapToken">一次性初始化凭证</label
           ><input
@@ -66,8 +29,9 @@
             autocomplete="off"
           />
           <details class="help-details">
-            <summary>在哪里获取初始化凭证？</summary>
-            <pre>docker compose exec web cat /app/data/bootstrap.token</pre>
+            <summary>如何获取初始化凭证</summary>
+            <pre>
+docker compose -f compose.lan.yaml exec web cat /app/data/bootstrap.token</pre>
           </details>
           <div class="form-cols">
             <div>
@@ -86,7 +50,7 @@
                 id="setupOpenId"
                 name="admin_open_id"
                 required
-                pattern="ou_[A-Za-z0-9_-]{8,150}"
+                pattern="ou_[A-Za-z0-9_\-]{8,150}"
                 placeholder="ou_…"
               />
             </div>
@@ -100,41 +64,30 @@
             minlength="10"
             maxlength="300"
             autocomplete="new-password"
-          /><label for="setupUrl">访问地址</label
+          /><label for="setupUrl">Web 访问地址</label
           ><input
             id="setupUrl"
             name="public_url"
             type="url"
             required
             maxlength="300"
-            placeholder="http://172.20.200.100:9099"
+            placeholder="http://服务器内网IP:9099"
           />
           <p class="field-hint">
-            内网可填写 http://内网IP:9099；HTTPS 可填写域名。不含路径。
+            内网填写 http://内网IP:9099；HTTPS 可填写域名与端口，不含路径。
           </p>
           <div class="callback-box">
-            <span>在飞书后台添加此回调地址</span
-            ><code id="setupCallback"
-              >https://你的域名/auth/feishu/callback</code
-            >
+            <span>飞书后台需登记此重定向 URL</span
+            ><code id="setupCallback">访问地址/auth/feishu/callback</code>
           </div>
-          <button class="primary full" type="submit">
-            完成初始化
-            <svg class="icon" aria-hidden="true">
-              <use href="/assets/icons.svg#arrow"></use>
-            </svg>
-          </button>
+          <button class="primary full" type="submit">完成初始化</button>
         </form>
         <p id="setupStatus" class="status" role="status" aria-live="polite"></p>
         <p id="loginLink" hidden>
-          <a class="primary full" href="/login"
-            >前往飞书登录
-            <svg class="icon" aria-hidden="true">
-              <use href="/assets/icons.svg#arrow"></use></svg
-          ></a>
+          <a class="primary full" href="/login">前往飞书登录 →</a>
         </p>
         <p class="field-hint">
-          首次配置可通过内网 HTTP 或 HTTPS 完成。成功后初始化凭证自动失效。
+          成功后一次性凭证自动失效，后续配置通过管理员登录修改。
         </p>
       </section>
     </main>

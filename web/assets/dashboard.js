@@ -7,12 +7,13 @@
     running = false,
     currentResult = null,
     raw = false;
-  $("today").textContent = new Date().toLocaleDateString("zh-CN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-  });
+  if ($("today"))
+    $("today").textContent = new Date().toLocaleDateString("zh-CN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      weekday: "long",
+    });
   function updateHost() {
     const host = hosts.find((h) => h.id === Number($("host").value));
     const proxy = host && proxies.find((p) => p.id === host.proxy_id);

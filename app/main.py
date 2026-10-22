@@ -7,10 +7,11 @@ import secrets
 import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlencode, urlsplit
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -215,6 +216,11 @@ def home(request: Request):
         admin(request)
     except HTTPException:
         return RedirectResponse("/login", status_code=303)
+    if request.query_params.get("host"):
+        return RedirectResponse(
+            "/diagnostics?" + urlencode({"host": request.query_params["host"]}),
+            status_code=303,
+        )
     return FileResponse(WEB / "index.html")
 
 
@@ -241,6 +247,29 @@ def settings_page(request: Request):
     except HTTPException:
         return RedirectResponse("/login", status_code=303)
     return FileResponse(WEB / "settings.html")
+
+
+def protected_page(request: Request, filename: str):
+    try:
+        admin(request)
+    except HTTPException:
+        return RedirectResponse("/login", status_code=303)
+    return FileResponse(WEB / filename)
+
+
+@app.get("/diagnostics")
+def diagnostics_page(request: Request):
+    return protected_page(request, "diagnostics.html")
+
+
+@app.get("/connections")
+def connections_page(request: Request):
+    return protected_page(request, "connections.html")
+
+
+@app.get("/activity")
+def activity_page(request: Request):
+    return protected_page(request, "activity.html")
 
 
 @app.get("/healthz")
@@ -372,6 +401,7 @@ def me(request: Request):
     return {
         "open_id": security.admin(request),
         "role": "admin",
+        "access_protocol": urlsplit(security.get("public_url") or "").scheme,
         "csrf_token": security.csrf_token(request),
         "version": VERSION,
     }
@@ -393,6 +423,7 @@ def settings():
         "public_url": security.get("public_url"),
         "app_secret_configured": bool(security.get("feishu_app_secret")),
         "ssh_private_key_configured": bool(security.get("ssh_private_key")),
+        **diagnostics.public_key_info(),
     }
 
 
@@ -579,6 +610,33 @@ def update_host(row_id: int, req: HostCreate, request: Request):
         raise HTTPException(404, "Host not found")
     security.audit(security.admin(request), "update_host:" + str(row_id))
     return {"id": saved}
+
+
+@app.get("/api/status", dependencies=[Depends(admin)])
+def status():
+    result = diagnostics.overview()
+    origin = security.get("public_url") or ""
+    result.update(
+        {
+            "version": VERSION,
+            "public_url": origin,
+            "protocol": urlsplit(origin).scheme,
+            "callback_url": origin + "/auth/feishu/callback",
+            "mcp_transport": "stdio",
+            "readonly_actions": sorted(diagnostics.ACTIONS | {"service"}),
+        }
+    )
+    return result
+
+
+@app.get("/api/activity", dependencies=[Depends(admin)])
+def activity(
+    page: int = Query(default=1, ge=1, le=1000000),
+    page_size: int = Query(default=20, ge=1, le=100),
+    status: Literal["all", "success", "warning", "failed"] = "all",
+    query: str = Query(default="", max_length=80),
+):
+    return diagnostics.run_page(page, page_size, status, query)
 
 
 @app.get("/api/runs", dependencies=[Depends(admin)])

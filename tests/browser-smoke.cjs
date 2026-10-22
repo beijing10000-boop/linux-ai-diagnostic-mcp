@@ -35,6 +35,13 @@ function health() {
   });
 }
 async function screenshot(page, name) {
+  if (await page.locator("#toast").count())
+    await page.locator("#toast").waitFor({ state: "hidden", timeout: 6000 });
+  await page.evaluate(() => {
+    document.activeElement?.blur();
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  });
+  await page.waitForFunction(() => window.scrollY <= 1);
   await page.screenshot({
     path: path.join(artifacts, name + ".png"),
     fullPage: true,
@@ -151,7 +158,7 @@ async function checkOverflow(page) {
     await page.locator("#loginLink").waitFor({ state: "visible" });
     assert(await page.locator("#setupForm").isHidden());
     await page.goto(origin + "/login");
-    await page.getByRole("link", { name: "使用飞书登录" }).waitFor();
+    await page.getByRole("link", { name: "使用飞书账号登录" }).waitFor();
     await screenshot(page, "login-desktop");
     assert.equal(
       (await context.request.get(origin + "/api/hosts")).status(),
@@ -170,6 +177,9 @@ async function checkOverflow(page) {
     ]);
     await page.goto(origin);
     await waitText(page, "#hostCount", "0");
+    await page.locator("#recentEmpty").waitFor({ state: "visible" });
+    assert.equal(await page.locator(".nav-item").count(), 6);
+    await page.goto(origin + "/diagnostics");
     await page.locator("#runsEmpty").waitFor({ state: "visible" });
     assert(await page.locator("#run").isDisabled());
     await page.goto(origin + "/settings");
@@ -285,16 +295,99 @@ async function checkOverflow(page) {
     await page.locator("#action").selectOption("cpu");
     await page.locator("#run").click();
     await waitText(page, "#resultBadge", "执行完成");
-    await screenshot(page, "dashboard-desktop");
+    await screenshot(page, "diagnostics-desktop");
     await page.reload();
     await page
       .getByRole("button", { name: "查看 D3-WEB-01 的诊断结果" })
       .first()
       .click();
     await waitText(page, "#output", "load average");
+    await page.goto(origin + "/settings");
+    await waitText(page, "#sshStatus", "已配置");
+    assert.equal(await page.locator("#web_protocol").inputValue(), protocol);
+    assert.equal(
+      await page.locator("#web_public_host").inputValue(),
+      "127.0.0.1:" + (protocol === "http" ? "9098" : "9443"),
+    );
+    await page.locator("#app_id").fill("cli_unsaved1234");
+    await page.locator("#reloadSettings").click();
+    await waitText(page, "#status", "已重新读取");
+    assert.equal(
+      await page.locator("#app_id").inputValue(),
+      "cli_browsertest123",
+    );
+    await page.locator("summary").click();
+    assert(
+      (await page.locator("#sshPublicKey").inputValue()).startsWith(
+        "ssh-ed25519 ",
+      ),
+    );
+    await screenshot(page, "settings-desktop");
+    await page.goto(origin + "/connections");
+    await waitText(page, "#platformStatus", "配置检查完成");
+    await page
+      .locator("#testHost")
+      .selectOption({ label: "D3-WEB-01 · 172.20.1.10" });
+    await page.locator("#testConnection").click();
+    await waitText(page, "#connectionStatus", "查询完成");
+    await waitText(page, "#connectionOutput", "load average");
+    await screenshot(page, "connections-desktop");
+    await page.goto(origin);
+    await waitText(page, "#runTotal", "5");
+    await page.getByRole("link", { name: "执行失败 · 查看明细 →" }).click();
+    await waitText(page, "#pageSummary", "共 1 条");
+    assert.equal(await page.locator("#runStatus").inputValue(), "failed");
+    await page.locator("#historyRows button").first().click();
+    await waitText(page, "#runDialogOutput", "超时");
+    await page.locator("#toggleRunJSON").click();
+    await waitText(page, "#runDialogOutput", '"error"');
+    await page.locator("#toggleRunJSON").click();
+    if (protocol === "http") {
+      await page.locator("#copyRunResult").click();
+      await waitText(page, "#toast", "已复制到剪贴板");
+      assert.equal(await page.locator(".clipboard-helper").count(), 0);
+      assert.equal(
+        await page
+          .locator("#copyRunResult")
+          .evaluate((el) => el === document.activeElement),
+        true,
+      );
+    }
+    await page.locator("#closeRunDialog").click();
+    await page.locator("#historyFilter button[type=reset]").click();
+    await waitText(page, "#pageSummary", "共 5 条");
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().includes("/api/activity?") &&
+          r.url().includes("page_size=50"),
+      ),
+      page.locator("#runPageSize").selectOption("50"),
+    ]);
+    assert.equal(await page.locator("#nextPage").isDisabled(), true);
+    await page.locator("#runSearch").fill("no-such-host");
+    await page.locator("#historyFilter button[type=submit]").click();
+    await page.locator("#historyEmpty").waitFor({ state: "visible" });
+    await page.locator("#historyFilter button[type=reset]").click();
+    await waitText(page, "#pageSummary", "共 5 条");
+    await waitText(page, "#audit", "诊断主机");
+    await page.locator("#auditSearch").fill("unlikely-no-match");
+    await page.locator("#auditEmpty").waitFor({ state: "visible" });
+    await page.locator("#auditSearch").fill("");
+    await screenshot(page, "activity-desktop");
+    await page.goto(origin);
+    await waitText(page, "#hostCount", "1");
+    await screenshot(page, "dashboard-desktop");
     for (const width of [1280, 1440, 1920]) {
-      await page.setViewportSize({ width, height: 900 });
-      for (const route of ["/", "/inventory", "/settings"]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const route of [
+        "/",
+        "/inventory",
+        "/settings",
+        "/connections",
+        "/diagnostics",
+        "/activity",
+      ]) {
         await page.goto(origin + route);
         await page.waitForFunction(
           () =>
@@ -309,13 +402,7 @@ async function checkOverflow(page) {
     await waitText(page, "#hostCount", "1");
     await screenshot(page, "dashboard-dark");
     await page.emulateMedia({ colorScheme: "light" });
-    await page.goto(origin + "/settings");
-    await waitText(page, "#audit", "diagnose");
-    await page.locator("#auditSearch").fill("unlikely-no-match");
-    await page.locator("#auditEmpty").waitFor({ state: "visible" });
-    await page.locator("#auditSearch").fill("");
-    await screenshot(page, "settings-desktop");
-    await page.getByRole("button", { name: "退出登录", exact: true }).click();
+    await page.getByRole("button", { name: "退出", exact: true }).click();
     await page.waitForURL(origin + "/login");
     assert.equal(
       (await context.request.get(origin + "/api/hosts")).status(),
@@ -323,7 +410,7 @@ async function checkOverflow(page) {
     );
     assert.deepEqual(errors, [], "No JavaScript or CSP errors");
     console.log(
-      "Browser checks passed: setup, auth gates, credential errors, CRUD, proxy protection, diagnostics, history, search, desktop/dark layout, logout.",
+      "Browser checks passed: setup, auth gates, credential errors, CRUD, proxy protection, diagnostics, settings reload, connection checks, overview links, task filters/results/copy, audit search, six-page desktop/dark layout, logout.",
     );
   } catch (error) {
     console.error(error.stack);

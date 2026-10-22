@@ -156,7 +156,7 @@
         wrap = Diag.node("div", "", "row-actions");
       if (active === "hosts") {
         const link = Diag.node("a", "诊断");
-        link.href = "/?host=" + row.id;
+        link.href = "/diagnostics?host=" + row.id;
         link.setAttribute("aria-label", "诊断 " + row.name);
         wrap.append(link);
       }

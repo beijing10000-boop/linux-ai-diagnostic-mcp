@@ -4,267 +4,217 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <title>系统设置 · Linux AI Diagnostic</title>
+    <title>系统配置 · Linux AI Diagnostic</title>
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <link rel="stylesheet" href="/assets/style.css" />
-    <script src="/assets/common.js" defer></script>
-    <script src="/assets/settings.js" defer></script>
+    <script defer src="/assets/common.js"></script>
+    <script defer src="/assets/settings.js"></script>
   </head>
-  <body>
+  <body data-page="settings">
     <a class="skip-link" href="#main">跳到主要内容</a>
-    <aside class="sidebar">
-      <a href="/" class="brand"
-        ><span class="brand-mark"
-          ><svg class="icon" aria-hidden="true">
-            <use href="/assets/icons.svg#terminal"></use></svg></span
-        ><span>Linux AI<span class="brand-sub">DIAGNOSTIC MCP</span></span></a
-      >
-      <div class="nav-caption">工作空间</div>
-      <nav aria-label="主导航">
-        <a href="/" class="nav-item"
-          ><svg class="icon" aria-hidden="true">
-            <use href="/assets/icons.svg#grid"></use></svg
-          ><span>诊断工作台</span></a
-        ><a href="/inventory" class="nav-item"
-          ><svg class="icon" aria-hidden="true">
-            <use href="/assets/icons.svg#server"></use></svg
-          ><span>资产与代理</span></a
-        ><a href="/settings" class="nav-item active" aria-current="page"
-          ><svg class="icon" aria-hidden="true">
-            <use href="/assets/icons.svg#settings"></use></svg
-          ><span>系统设置</span></a
-        >
-      </nav>
-      <div class="sidebar-bottom">
-        <div class="mode-card">
-          <svg class="icon" aria-hidden="true">
-            <use href="/assets/icons.svg#shield"></use>
-          </svg>
-          <div>
-            <strong>受限 SSH 诊断</strong><span>固定动作 · 公钥校验</span>
-          </div>
-        </div>
-        <div class="sidebar-meta">
-          <span data-version>版本读取中</span><span>端口 9099</span>
-        </div>
-      </div>
-    </aside>
+    <aside class="sidebar" id="appSidebar" aria-label="工作空间导航"></aside>
     <div class="workspace">
-      <header class="topbar">
-        <div class="breadcrumb">
-          工作空间 <span>/</span> <strong>系统设置</strong>
-        </div>
-        <div class="user-area">
-          <span class="user-badge"
-            ><svg class="icon" aria-hidden="true">
-              <use href="/assets/icons.svg#shield"></use>
-            </svg>
-            管理员</span
-          ><button
-            class="icon-button"
-            data-logout
-            aria-label="退出登录"
-            title="退出登录"
-          >
-            <svg class="icon" aria-hidden="true">
-              <use href="/assets/icons.svg#logout"></use>
-            </svg>
-          </button>
-        </div>
-      </header>
-      <main id="main" class="container">
-        <div class="headline">
-          <div>
-            <div class="eyebrow">CONFIGURATION</div>
-            <h1>系统设置<span class="heading-dot">.</span></h1>
-            <p class="muted">管理身份、连接凭据与每一次访问的记录。</p>
-          </div>
-          <span class="badge neutral"
-            ><svg class="icon" aria-hidden="true">
-              <use href="/assets/icons.svg#shield"></use>
-            </svg>
-            管理员专属</span
-          >
-        </div>
+      <header class="topbar" id="appHeader"></header>
+      <main class="container" id="main">
         <p id="status" class="status" role="status" aria-live="polite"></p>
-        <div class="settings-grid">
-          <section class="card">
-            <div class="section-heading">
-              <div class="section-icon">
-                <svg class="icon" aria-hidden="true">
-                  <use href="/assets/icons.svg#shield"></use>
-                </svg>
-              </div>
-              <div>
-                <h2>飞书身份验证</h2>
-                <p class="muted small">仅允许指定 Open ID 的管理员访问</p>
-              </div>
-            </div>
-            <form id="settingsForm">
-              <label for="app_id">应用 App ID</label
-              ><input
-                id="app_id"
-                name="app_id"
-                required
-                pattern="cli_[A-Za-z0-9]+"
-                autocomplete="off"
-                placeholder="cli_…"
-              /><label for="admin_open_id">管理员 Open ID</label
-              ><input
-                id="admin_open_id"
-                name="admin_open_id"
-                required
-                pattern="ou_[A-Za-z0-9_-]+"
-                autocomplete="off"
-                placeholder="ou_…"
-              /><label for="public_url">访问地址</label
-              ><input
-                id="public_url"
-                name="public_url"
-                required
-                type="url"
-                placeholder="http://172.20.200.100:9099"
-              /><label for="app_secret"
-                >更新 App Secret
-                <span class="optional">留空保持当前值</span></label
-              ><input
-                id="app_secret"
-                name="app_secret"
-                type="password"
-                minlength="10"
-                maxlength="300"
-                autocomplete="new-password"
-              />
-              <div class="callback-box">
-                <span>OAuth 回调地址</span><code id="callbackUrl">读取中…</code
-                ><button
-                  type="button"
-                  id="copyCallback"
-                  class="icon-button"
-                  aria-label="复制回调地址"
-                >
-                  <svg class="icon" aria-hidden="true">
-                    <use href="/assets/icons.svg#copy"></use>
-                  </svg>
-                </button>
-              </div>
-              <p class="field-hint">
-                实际修改登录配置后，所有会话会退出；请先在飞书后台配置对应的回调地址。
-              </p>
-              <button id="saveSettings" type="submit" class="primary">
-                保存登录配置
-                <svg class="icon" aria-hidden="true">
-                  <use href="/assets/icons.svg#arrow"></use>
-                </svg>
-              </button>
-              <p id="settingsStatus" class="status" role="status"></p>
-            </form>
-          </section>
-          <section class="card">
-            <div class="section-heading">
-              <div class="section-icon">
-                <svg class="icon" aria-hidden="true">
-                  <use href="/assets/icons.svg#key"></use>
-                </svg>
-              </div>
-              <div>
-                <h2>SSH 诊断凭据</h2>
-                <p class="muted small">目标 Linux 主机的专用 root 密钥</p>
-              </div>
-            </div>
-            <div class="credential-box">
-              <span class="credential-icon"
-                ><svg class="icon" aria-hidden="true">
-                  <use href="/assets/icons.svg#key"></use></svg
-              ></span>
-              <div>
-                <strong id="sshStatus">正在检查凭据</strong>
-                <p>Ed25519 · 加密存储 · 不回显</p>
-              </div>
-            </div>
-            <form id="sshForm">
-              <label for="ssh_key">新的 SSH 私钥</label
-              ><textarea
-                id="ssh_key"
-                name="private_key"
-                class="mono"
-                required
-                minlength="80"
-                maxlength="20000"
-                rows="6"
-                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
-                spellcheck="false"
-                autocomplete="off"
-              ></textarea
-              ><label for="ssh_passphrase"
-                >私钥口令 <span class="optional">如有</span></label
-              ><input
-                id="ssh_passphrase"
-                name="passphrase"
-                type="password"
-                maxlength="1000"
-                autocomplete="new-password"
-              />
-              <p class="field-hint">
-                仅部署诊断专用公钥；目标端通过强制命令网关限制可执行的动作。
-              </p>
-              <button id="saveSSH" type="submit" class="primary">
-                加密保存凭据
-                <svg class="icon" aria-hidden="true">
-                  <use href="/assets/icons.svg#arrow"></use>
-                </svg>
-              </button>
-              <p id="sshSaveStatus" class="status" role="status"></p>
-            </form>
-            <details class="help-details">
-              <summary>如何获取并核验主机公钥</summary>
-              <p>通过可信控制台执行以下命令，再将公钥填入资产管理。</p>
-              <pre>
-cat /etc/ssh/ssh_host_ed25519_key.pub
-ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub</pre>
-            </details>
-          </section>
-        </div>
-        <section class="card audit-card">
+        <section class="card">
           <div class="section-heading">
             <div>
-              <div class="eyebrow">SECURITY ACTIVITY</div>
-              <h2>安全审计</h2>
+              <h2>系统配置</h2>
+              <p class="sub">
+                管理访问方式、飞书登录和 SSH 凭据。敏感内容保存后不会回显。
+              </p>
             </div>
-            <div class="search-field audit-search">
-              <svg class="icon" aria-hidden="true">
-                <use href="/assets/icons.svg#search"></use></svg
-              ><input
-                id="auditSearch"
-                type="search"
-                aria-label="筛选审计日志"
-                placeholder="筛选用户或操作…"
-              />
-            </div>
-            <button id="refreshAudit" class="secondary">
+            <button id="reloadSettings" class="secondary">
               <svg class="icon" aria-hidden="true">
                 <use href="/assets/icons.svg#refresh"></use>
               </svg>
-              刷新
+              重新读取
             </button>
           </div>
-          <div class="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>时间</th>
-                  <th>操作人</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="audit"></tbody>
-            </table>
+          <div class="info">
+            当前支持内网
+            HTTP。修改访问协议或地址后，请同步更新飞书回调地址；实际变更登录配置将注销当前会话。HTTPS
+            证书与入口由服务器配置。
           </div>
-          <p id="auditEmpty" class="empty-inline" hidden>暂无匹配的审计记录</p>
-          <p id="auditStatus" class="status" role="status"></p>
+          <form id="settingsForm">
+            <h3 class="ops-section-title">平台与访问</h3>
+            <div class="form-cols">
+              <div>
+                <label for="web_protocol">Web 访问协议</label
+                ><select id="web_protocol">
+                  <option value="http">HTTP（内网访问）</option>
+                  <option value="https">HTTPS</option>
+                </select>
+              </div>
+              <div>
+                <label for="web_public_host">访问地址（IP / 域名与端口）</label
+                ><input
+                  id="web_public_host"
+                  required
+                  placeholder="172.20.200.100:9099"
+                  maxlength="250"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+            <input type="hidden" id="public_url" name="public_url" />
+            <div class="callback-box">
+              <span>飞书重定向 URL</span><code id="callbackUrl">正在读取…</code
+              ><button
+                id="copyCallback"
+                type="button"
+                class="icon-button"
+                aria-label="复制回调地址"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#copy"></use>
+                </svg>
+              </button>
+            </div>
+            <h3 class="ops-section-title">飞书登录与管理员</h3>
+            <div class="form-cols">
+              <div>
+                <label for="app_id">飞书 App ID</label
+                ><input
+                  id="app_id"
+                  required
+                  pattern="cli_[A-Za-z0-9]{8,80}"
+                  maxlength="84"
+                  autocomplete="off"
+                  placeholder="cli_…"
+                />
+              </div>
+              <div>
+                <label for="admin_open_id">管理员 Open ID</label
+                ><input
+                  id="admin_open_id"
+                  required
+                  pattern="ou_[A-Za-z0-9_\-]{8,150}"
+                  maxlength="153"
+                  autocomplete="off"
+                  placeholder="ou_…"
+                />
+              </div>
+              <div>
+                <label for="app_secret">飞书 App Secret</label
+                ><input
+                  id="app_secret"
+                  type="password"
+                  minlength="10"
+                  maxlength="300"
+                  autocomplete="new-password"
+                />
+                <p id="feishuSecretHint" class="field-hint">
+                  留空保持已保存的 Secret
+                </p>
+              </div>
+              <div class="field-summary">
+                <strong>身份与权限</strong>
+                <p class="sub">
+                  仅允许配置的飞书管理员访问。初始化、设置变更和 SSH
+                  诊断采用独立的会话与权限校验。
+                </p>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="saveSettings" class="primary" type="submit">
+                保存配置
+              </button>
+            </div>
+            <p id="settingsStatus" class="status" role="status"></p>
+          </form>
+        </section>
+        <section class="card" id="ssh">
+          <div class="section-heading">
+            <div>
+              <h2>SSH 诊断凭据</h2>
+              <p class="sub">
+                目标主机使用专用 root 密钥；跳板代理的独立密钥在资产管理中配置。
+              </p>
+            </div>
+            <span class="badge neutral" id="sshStatus">正在检查…</span>
+          </div>
+          <form id="sshForm">
+            <div class="form-cols">
+              <div>
+                <label for="ssh_key">新的 Ed25519 私钥</label
+                ><textarea
+                  id="ssh_key"
+                  name="private_key"
+                  class="mono"
+                  minlength="80"
+                  maxlength="20000"
+                  rows="6"
+                  required
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                ></textarea>
+                <p class="field-hint">
+                  仅录入诊断专用私钥。保存后输入框清空，当前密钥不会回显。
+                </p>
+              </div>
+              <div>
+                <label for="ssh_passphrase">私钥解密口令（如有）</label
+                ><input
+                  id="ssh_passphrase"
+                  type="password"
+                  maxlength="1000"
+                  autocomplete="new-password"
+                />
+                <div class="info credential-note">
+                  目标服务器仍需为这把密钥的公钥配置强制命令网关。root
+                  账号的操作范围由目标端网关限制。
+                </div>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="saveSSH" type="submit" class="primary">
+                加密保存 SSH 凭据</button
+              ><a class="secondary" href="/connections">前往连接调试</a>
+            </div>
+            <p id="sshSaveStatus" class="status" role="status"></p>
+          </form>
+          <details class="help-details">
+            <summary>查看诊断公钥与部署说明</summary>
+            <label for="sshPublicKey">诊断公钥（可部署到目标端）</label
+            ><textarea
+              id="sshPublicKey"
+              class="mono"
+              rows="3"
+              readonly
+              placeholder="保存有效私钥后显示对应公钥"
+            ></textarea>
+            <div class="actions">
+              <button id="copyPublicKey" class="secondary" type="button">
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#copy"></use>
+                </svg>
+                复制公钥</button
+              ><span class="sub mono" id="sshFingerprint"></span>
+            </div>
+            <p class="sub">
+              通过可信控制台读取目标主机的
+              /etc/ssh/ssh_host_ed25519_key.pub，并在资产管理中核验和固定它。诊断公钥与目标主机公钥用途不同。
+            </p>
+          </details>
+        </section>
+        <section class="card">
+          <h2>操作审计</h2>
+          <p class="sub">
+            配置修改、飞书登录与诊断结果统一记录，可在任务与审计中筛选查看。
+          </p>
+          <div class="actions">
+            <a class="secondary" href="/activity"
+              >打开任务与审计
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#arrow"></use></svg
+            ></a>
+          </div>
         </section>
         <footer>
-          <span>Linux AI Diagnostic MCP</span
+          <span>Linux AI Diagnostic · 只读诊断平台</span
           ><span>所有诊断操作均记录审计</span>
         </footer>
       </main>
