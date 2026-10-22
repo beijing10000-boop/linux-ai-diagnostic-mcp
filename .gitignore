@@ -1,8 +1,16 @@
 .env
+.env.*
+!.env.example
+data/
+secrets/
 *.pem
 *.key
 id_ed25519*
+known_hosts
 __pycache__/
 .venv/
 *.db
 .pytest_cache/
+.ruff_cache/
+.coverage
+dist/

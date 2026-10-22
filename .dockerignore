@@ -1,0 +1,14 @@
+.git
+.github
+data
+secrets
+tests
+.venv
+__pycache__
+*.key
+*.pem
+*.db
+.env*
+known_hosts
+README.md
+docs
