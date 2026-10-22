@@ -1,8 +1,6 @@
 """Persistent inventory with explicit SSH host-key pinning and private-IP restrictions."""
 import base64
 import ipaddress
-import re
-import sqlite3
 import paramiko
 from . import storage
 
