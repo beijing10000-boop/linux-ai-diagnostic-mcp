@@ -44,6 +44,10 @@ class HostCreate(BaseModel):
 def home():
     return FileResponse("web/index.html")
 
+@app.get("/inventory")
+def inventory_page():
+    return FileResponse("web/inventory.html")
+
 @app.get("/healthz")
 def health():
     return {"status": "ok"}
