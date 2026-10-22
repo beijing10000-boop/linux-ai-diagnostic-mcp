@@ -1,0 +1,41 @@
+name: Tag tested v0.1.0
+
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements-dev.txt
+      - run: python -m compileall -q app tests && ruff check . --select E4,E7,E9,F && pytest -q
+      - name: Create immutable release tag if absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(cat VERSION)"
+          if [[ "$VERSION" != "0.1.0" ]]; then
+            echo "Refusing to tag unexpected version: $VERSION"
+            exit 1
+          fi
+          TAG="v$VERSION"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG"; then
+            echo "Tag $TAG already exists; leaving unchanged"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Linux AI Diagnostic $TAG (testing baseline)"
+          git push origin "$TAG"
