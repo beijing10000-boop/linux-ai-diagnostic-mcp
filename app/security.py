@@ -67,10 +67,6 @@ def get(key: str) -> str | None:
     return storage.decrypt(row["value"]) if row else None
 
 
-def put(key: str, value: str) -> None:
-    put_many({key: value})
-
-
 def put_many(values: dict[str, str], revoke_sessions: bool = False) -> None:
     if not values.keys() <= ALLOWED_SETTINGS:
         raise ValueError("Invalid settings key")
@@ -93,8 +89,10 @@ def setup(
         c.execute("BEGIN IMMEDIATE")
         if c.execute("SELECT 1 FROM app_settings WHERE key='feishu_app_id'").fetchone():
             raise HTTPException(409, "Already initialized")
-        if not storage.BOOTSTRAP.exists() or not secrets.compare_digest(
-            token, storage.BOOTSTRAP.read_text()
+        if (
+            not token.isascii()
+            or not storage.BOOTSTRAP.exists()
+            or not secrets.compare_digest(token, storage.BOOTSTRAP.read_text())
         ):
             raise HTTPException(403, "Invalid bootstrap token")
         for key, value in {
@@ -173,7 +171,7 @@ def admin(request: Request) -> str:
 
 
 def csrf_token(request: Request) -> str:
-    admin(request)
+    """Derive the token after the caller has authenticated the request."""
     cookie = request.cookies["diag_session"]
     return hmac.new(
         storage.key(), ("csrf:" + cookie).encode(), hashlib.sha256
@@ -185,25 +183,25 @@ def secure_cookie() -> bool:
     return urlsplit(get("public_url") or "").scheme == "https"
 
 
-def csrf_guard(request: Request) -> None:
-    admin(request)
+def csrf_guard(request: Request) -> str:
+    who = admin(request)
     origin = request.headers.get("origin", "")
     if origin != get("public_url"):
         raise HTTPException(403, "Origin mismatch")
     submitted = request.headers.get("x-csrf-token", "")
-    if not submitted or not secrets.compare_digest(submitted, csrf_token(request)):
+    if (
+        not submitted.isascii()
+        or not submitted
+        or not secrets.compare_digest(submitted, csrf_token(request))
+    ):
         raise HTTPException(403, "Invalid CSRF token")
+    return who
 
 
 def revoke(request: Request) -> None:
     token = request.cookies.get("diag_session", "")
     with storage.connect() as c:
         c.execute("DELETE FROM sessions WHERE token_hash=?", (_hash(token),))
-
-
-def revoke_all_sessions() -> None:
-    with storage.connect() as c:
-        c.execute("DELETE FROM sessions")
 
 
 def audit(who: str, action: str) -> None:

@@ -14,6 +14,7 @@ def test_bootstrap_once(client):
     }
     response = client.post("/setup", json=payload)
     assert response.status_code == 200
+    assert response.json()["login_url"] == PUBLIC_URL + "/login"
     assert not storage.BOOTSTRAP.exists()
     assert client.post("/setup", json=payload).status_code == 409
     assert b"secret_for_test_12345" not in storage.DB.read_bytes()
@@ -39,6 +40,35 @@ def test_no_anonymous_access(configured):
         ).status_code
         == 401
     )
+
+
+def test_non_ascii_setup_token_is_rejected(client):
+    response = client.post(
+        "/setup",
+        json={
+            "bootstrap_token": "无效" * 20,
+            "app_id": APP_ID,
+            "app_secret": "secret_for_test_12345",
+            "admin_open_id": OPEN_ID,
+            "public_url": PUBLIC_URL,
+        },
+    )
+    assert response.status_code == 403
+    assert storage.BOOTSTRAP.exists() and not security.configured()
+
+
+def test_non_ascii_csrf_token_is_rejected(authorized):
+    client, _ = authorized
+    response = client.post(
+        "/api/groups",
+        json={"name": "rejected"},
+        headers={
+            "Origin": PUBLIC_URL,
+            "X-CSRF-Token": b"\xff" * 64,
+        },
+    )
+    assert response.status_code == 403
+    assert client.get("/api/groups").json() == []
 
 
 def test_csrf_enforced(authorized):

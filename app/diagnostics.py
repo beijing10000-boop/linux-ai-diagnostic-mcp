@@ -16,6 +16,7 @@ ACTIONS = frozenset(("cpu", "memory", "disk", "network", "sockets", "processes")
 SERVICE_RE = re.compile(r"^[A-Za-z0-9_.@-]{1,64}$", re.ASCII)
 SLOTS = threading.BoundedSemaphore(4)
 MAX_STDOUT, MAX_STDERR = 32768, 2048
+COMMAND_TIMEOUT = 15
 
 
 class DiagnosticError(RuntimeError):
@@ -81,7 +82,7 @@ def _connect(client, address, port, username, host_key, key, sock=None):
 
 
 def _read_channel(chan, host_id, action):
-    deadline = time.monotonic() + 15
+    deadline = time.monotonic() + COMMAND_TIMEOUT
     out, err = bytearray(), bytearray()
     while time.monotonic() < deadline:
         for ready, recv, buf, limit in (
@@ -121,6 +122,36 @@ def _read_channel(chan, host_id, action):
     raise DiagnosticError(
         "SSH diagnostic timed out; check the target gateway and network", 504
     )
+
+
+def _execute_channel(chan, host_id, action, command, jump=None):
+    # Paramiko's exec acknowledgement waits on an Event, ignoring settimeout().
+    # Close transports to release that wait even during key renegotiation.
+    expired = threading.Event()
+
+    def expire():
+        expired.set()
+        if jump is not None:
+            jump.close()
+        chan.get_transport().close()
+
+    timer = threading.Timer(COMMAND_TIMEOUT, expire)
+    timer.daemon = True
+    timer.start()
+    try:
+        chan.exec_command(command)
+        result = _read_channel(chan, host_id, action)
+    except Exception:
+        if not expired.is_set():
+            raise
+    finally:
+        timer.cancel()
+        timer.join()
+    if expired.is_set():
+        raise DiagnosticError(
+            "SSH diagnostic timed out; check the target gateway and network", 504
+        )
+    return result
 
 
 def execute(host_id: int, action: str, service: str | None = None) -> dict:
@@ -177,8 +208,7 @@ def execute(host_id: int, action: str, service: str | None = None) -> dict:
             raise DiagnosticError("SSH transport unavailable")
         chan = transport.open_session(timeout=5)
         chan.settimeout(5)
-        chan.exec_command(command)
-        return _read_channel(chan, host_id, action)
+        return _execute_channel(chan, host_id, action, command, jump)
     except paramiko.BadHostKeyException as exc:
         raise DiagnosticError(
             "SSH host key mismatch; verify the target and proxy public keys"
@@ -200,27 +230,29 @@ def execute(host_id: int, action: str, service: str | None = None) -> dict:
             "SSH connection failed; check sshd, network and pinned host keys"
         ) from exc
     finally:
-        if chan is not None:
-            chan.close()
-        client.close()
-        if tunnel is not None:
-            tunnel.close()
-        if jump is not None:
-            jump.close()
-        SLOTS.release()
+        try:
+            if jump is not None:
+                jump.close()
+        finally:
+            try:
+                client.close()
+            finally:
+                SLOTS.release()
 
 
 def run(host_id: int, action: str, service: str | None, actor: str) -> dict:
     """Share audit and encrypted history between Web and MCP callers."""
     start = time.monotonic()
     host = inventory.get_host(host_id)
+    result = None
     try:
         result = execute(host_id, action, service)
-        status = (
-            "success"
-            if result.get("exit_code") == 0 and not result.get("truncated")
-            else "warning"
-        )
+        if result.get("truncated") or (
+            action == "service" and result.get("exit_code") == 3
+        ):
+            status = "warning"
+        else:
+            status = "success" if result.get("exit_code") == 0 else "failed"
     except Exception as exc:
         status = "failed"
         result = {
@@ -230,8 +262,9 @@ def run(host_id: int, action: str, service: str | None, actor: str) -> dict:
         }
         raise
     finally:
-        if "result" in locals():
+        if result is not None:
             duration = int((time.monotonic() - start) * 1000)
+            result.update(status=status, duration_ms=duration)
             security.audit(actor, f"diagnose:{host_id}:{action}:{status}")
             with storage.connect() as c:
                 c.execute(
@@ -250,17 +283,11 @@ def run(host_id: int, action: str, service: str | None, actor: str) -> dict:
                 c.execute(
                     "DELETE FROM diagnostic_runs WHERE id NOT IN (SELECT id FROM diagnostic_runs ORDER BY id DESC LIMIT 500)"
                 )
-    result["duration_ms"] = duration
     return result
 
 
 def recent_runs() -> list[dict]:
-    with storage.connect() as c:
-        return [
-            dict(row)
-            for row in c.execute("""SELECT id,host_id,host_name,action,service,time,duration_ms,status
-            FROM diagnostic_runs ORDER BY id DESC LIMIT 50""")
-        ]
+    return run_page(page_size=50)["items"]
 
 
 def get_run(row_id: int) -> dict | None:

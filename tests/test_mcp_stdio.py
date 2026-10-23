@@ -12,7 +12,7 @@ from .test_inventory_diagnostics import valid_host_key
 
 
 def test_local_mcp_protocol_and_denied_commands(configured):
-    host_id = inventory.add_host(
+    host_id = inventory.save_host(
         "mcp-test", "172.20.1.30", 22, None, None, valid_host_key()
     )
 

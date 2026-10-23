@@ -77,10 +77,10 @@
           $("connectionOutput").textContent = Diag.resultText(r);
           Diag.message(
             "connectionStatus",
-            r.exit_code === 0 && !r.truncated
+            r.status === "success"
               ? `查询完成 · ${Diag.duration(r.duration_ms)} · 可在任务与审计查看记录`
-              : `已收到查询结果，退出状态 ${r.exit_code ?? "未返回"}，请核对下方输出`,
-            r.exit_code !== 0,
+              : `${r.status === "failed" ? "查询失败" : "查询需要关注"} · 退出状态 ${r.exit_code ?? "未返回"}，请核对下方输出`,
+            r.status === "failed",
           );
         } catch (err) {
           Diag.message("connectionStatus", err.message, true);

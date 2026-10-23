@@ -10,9 +10,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +41,7 @@ jobs:
 
   browser:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -48,7 +54,7 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: npm ci
       - run: npm run check:web
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps --only-shell chromium
       - name: Browser regression against isolated HTTPS fixture
         run: npm run test:ui
         env:
@@ -69,6 +75,7 @@ jobs:
 
   docker-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Prepare persistent data ownership
@@ -90,7 +97,7 @@ jobs:
             fi
             sleep 2
           done
-          python -c 'import json; assert json.load(open("/tmp/health.json"))["version"] == "0.1.0"'
+          python -c 'import json; from pathlib import Path; assert json.load(open("/tmp/health.json"))["version"] == Path("VERSION").read_text().strip()'
           docker compose exec -T web test -s /app/data/bootstrap.token
           test "$(docker compose port web 9099)" = "127.0.0.1:9099"
       - name: Docker logs on failure

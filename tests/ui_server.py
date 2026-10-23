@@ -56,6 +56,7 @@ def main():
                     504,
                 )
             inactive = action == "service" and service != "nginx"
+            missing_tool = action == "memory"
             output = (
                 "inactive\n"
                 if inactive
@@ -64,9 +65,9 @@ def main():
             return {
                 "host_id": host_id,
                 "action": action,
-                "output": output,
-                "stderr": "",
-                "exit_code": 3 if inactive else 0,
+                "output": "" if missing_tool else output,
+                "stderr": "free: command not found" if missing_tool else "",
+                "exit_code": 127 if missing_tool else 3 if inactive else 0,
                 "truncated": False,
             }
 

@@ -110,7 +110,6 @@ h3 {
   vertical-align: middle;
 }
 .sub,
-.muted,
 .small {
   color: var(--muted);
 }

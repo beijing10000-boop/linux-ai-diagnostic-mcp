@@ -18,10 +18,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from . import diagnostics, inventory, security
+from .security import admin, csrf_guard as mutation
 
-VERSION = "0.1.0"
+ROOT = Path(__file__).resolve().parent.parent
+VERSION = (ROOT / "VERSION").read_text().strip()
 LOG = logging.getLogger(__name__)
-WEB = Path(__file__).resolve().parent.parent / "web"
+WEB = ROOT / "web"
 
 
 @asynccontextmanager
@@ -74,15 +76,6 @@ async def security_headers(request: Request, call_next):
         response.headers["Strict-Transport-Security"] = "max-age=31536000"
     response.headers["Cache-Control"] = "no-store"
     return response
-
-
-def admin(request: Request) -> str:
-    return security.admin(request)
-
-
-def mutation(request: Request) -> str:
-    security.csrf_guard(request)
-    return security.admin(request)
 
 
 def check_url(raw: str) -> str:
@@ -233,20 +226,12 @@ def login():
 
 @app.get("/inventory")
 def inventory_page(request: Request):
-    try:
-        admin(request)
-    except HTTPException:
-        return RedirectResponse("/login", status_code=303)
-    return FileResponse(WEB / "inventory.html")
+    return protected_page(request, "inventory.html")
 
 
 @app.get("/settings")
 def settings_page(request: Request):
-    try:
-        admin(request)
-    except HTTPException:
-        return RedirectResponse("/login", status_code=303)
-    return FileResponse(WEB / "settings.html")
+    return protected_page(request, "settings.html")
 
 
 def protected_page(request: Request, filename: str):
@@ -288,7 +273,11 @@ def bootstrap(body: BootstrapRequest, request: Request):
         body.admin_open_id,
         public_url,
     )
-    return {"ok": True, "redirect_uri": public_url + "/auth/feishu/callback"}
+    return {
+        "ok": True,
+        "redirect_uri": public_url + "/auth/feishu/callback",
+        "login_url": public_url + "/login",
+    }
 
 
 @app.get("/auth/feishu")
@@ -396,10 +385,10 @@ async def feishu_callback(
     return result
 
 
-@app.get("/api/me", dependencies=[Depends(admin)])
-def me(request: Request):
+@app.get("/api/me")
+def me(request: Request, who: str = Depends(admin)):
     return {
-        "open_id": security.admin(request),
+        "open_id": who,
         "role": "admin",
         "access_protocol": urlsplit(security.get("public_url") or "").scheme,
         "csrf_token": security.csrf_token(request),
@@ -427,8 +416,8 @@ def settings():
     }
 
 
-@app.put("/api/settings", dependencies=[Depends(mutation)])
-def update_settings(body: SettingsUpdate, request: Request):
+@app.put("/api/settings")
+def update_settings(body: SettingsUpdate, who: str = Depends(mutation)):
     values = body.model_dump(exclude_none=True)
     if "public_url" in values:
         values["public_url"] = check_url(values["public_url"])
@@ -438,7 +427,6 @@ def update_settings(body: SettingsUpdate, request: Request):
         "admin_open_id": "admin_open_id",
         "public_url": "public_url",
     }
-    who = security.admin(request)
     changed = {
         mapping[key]: value
         for key, value in values.items()
@@ -455,8 +443,8 @@ def update_settings(body: SettingsUpdate, request: Request):
     }
 
 
-@app.put("/api/settings/ssh", dependencies=[Depends(mutation)])
-def update_ssh(body: SSHSettingsUpdate, request: Request):
+@app.put("/api/settings/ssh")
+def update_ssh(body: SSHSettingsUpdate, who: str = Depends(mutation)):
     try:
         diagnostics.validate_private_key(body.private_key, body.passphrase)
     except ValueError as exc:
@@ -467,7 +455,7 @@ def update_ssh(body: SSHSettingsUpdate, request: Request):
             "ssh_key_passphrase": body.passphrase or "",
         }
     )
-    security.audit(security.admin(request), "rotate_ssh_credential")
+    security.audit(who, "rotate_ssh_credential")
     return {"ok": True}
 
 
@@ -481,23 +469,23 @@ def groups():
     return inventory.list_rows("host_groups")
 
 
-@app.post("/api/groups", dependencies=[Depends(mutation)])
-def create_group(req: NameCreate, request: Request):
+@app.post("/api/groups")
+def create_group(req: NameCreate, who: str = Depends(mutation)):
     try:
-        group_id = inventory.add_group(req.name, req.description)
+        group_id = inventory.save_group(req.name, req.description)
     except sqlite3.IntegrityError:
         raise HTTPException(409, "Duplicate group")
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
-    security.audit(security.admin(request), "create_group")
+    security.audit(who, "create_group")
     return {"id": group_id}
 
 
-@app.delete("/api/groups/{row_id}", dependencies=[Depends(mutation)])
-def delete_group(row_id: int, request: Request):
+@app.delete("/api/groups/{row_id}")
+def delete_group(row_id: int, who: str = Depends(mutation)):
     if not inventory.remove("host_groups", row_id):
         raise HTTPException(404, "Group not found")
-    security.audit(security.admin(request), "delete_group")
+    security.audit(who, "delete_group")
     return {"ok": True}
 
 
@@ -520,29 +508,29 @@ def save_proxy(req: ProxySave, row_id: int | None = None):
     return {"id": saved}
 
 
-@app.post("/api/proxies", dependencies=[Depends(mutation)])
-def create_proxy(req: ProxySave, request: Request):
+@app.post("/api/proxies")
+def create_proxy(req: ProxySave, who: str = Depends(mutation)):
     result = save_proxy(req)
-    security.audit(security.admin(request), "create_proxy:" + str(result["id"]))
+    security.audit(who, "create_proxy:" + str(result["id"]))
     return result
 
 
-@app.put("/api/proxies/{row_id}", dependencies=[Depends(mutation)])
-def update_proxy(row_id: int, req: ProxySave, request: Request):
+@app.put("/api/proxies/{row_id}")
+def update_proxy(row_id: int, req: ProxySave, who: str = Depends(mutation)):
     result = save_proxy(req, row_id)
-    security.audit(security.admin(request), "update_proxy:" + str(row_id))
+    security.audit(who, "update_proxy:" + str(row_id))
     return result
 
 
-@app.delete("/api/proxies/{row_id}", dependencies=[Depends(mutation)])
-def delete_proxy(row_id: int, request: Request):
+@app.delete("/api/proxies/{row_id}")
+def delete_proxy(row_id: int, who: str = Depends(mutation)):
     try:
         deleted = inventory.remove("proxies", row_id)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
     if not deleted:
         raise HTTPException(404, "Proxy not found")
-    security.audit(security.admin(request), "delete_proxy")
+    security.audit(who, "delete_proxy")
     return {"ok": True}
 
 
@@ -551,10 +539,10 @@ def hosts():
     return inventory.list_rows("hosts")
 
 
-@app.post("/api/hosts", dependencies=[Depends(mutation)])
-def create_host(req: HostCreate, request: Request):
+@app.post("/api/hosts")
+def create_host(req: HostCreate, who: str = Depends(mutation)):
     try:
-        host_id = inventory.add_host(
+        host_id = inventory.save_host(
             req.name,
             req.address,
             req.ssh_port,
@@ -566,32 +554,32 @@ def create_host(req: HostCreate, request: Request):
         raise HTTPException(409, "Duplicate host")
     except ValueError as exc:
         raise HTTPException(400, str(exc))
-    security.audit(security.admin(request), "create_host")
+    security.audit(who, "create_host")
     return {"id": host_id}
 
 
-@app.delete("/api/hosts/{row_id}", dependencies=[Depends(mutation)])
-def delete_host(row_id: int, request: Request):
+@app.delete("/api/hosts/{row_id}")
+def delete_host(row_id: int, who: str = Depends(mutation)):
     if not inventory.remove("hosts", row_id):
         raise HTTPException(404, "Host not found")
-    security.audit(security.admin(request), "delete_host")
+    security.audit(who, "delete_host")
     return {"ok": True}
 
 
-@app.put("/api/groups/{row_id}", dependencies=[Depends(mutation)])
-def update_group(row_id: int, req: NameCreate, request: Request):
+@app.put("/api/groups/{row_id}")
+def update_group(row_id: int, req: NameCreate, who: str = Depends(mutation)):
     try:
         saved = inventory.save_group(req.name, req.description, row_id)
     except sqlite3.IntegrityError as exc:
         raise HTTPException(409, "Duplicate group") from exc
     if saved is None:
         raise HTTPException(404, "Group not found")
-    security.audit(security.admin(request), "update_group:" + str(row_id))
+    security.audit(who, "update_group:" + str(row_id))
     return {"id": saved}
 
 
-@app.put("/api/hosts/{row_id}", dependencies=[Depends(mutation)])
-def update_host(row_id: int, req: HostCreate, request: Request):
+@app.put("/api/hosts/{row_id}")
+def update_host(row_id: int, req: HostCreate, who: str = Depends(mutation)):
     try:
         saved = inventory.save_host(
             req.name,
@@ -608,7 +596,7 @@ def update_host(row_id: int, req: HostCreate, request: Request):
         raise HTTPException(400, str(exc)) from exc
     if saved is None:
         raise HTTPException(404, "Host not found")
-    security.audit(security.admin(request), "update_host:" + str(row_id))
+    security.audit(who, "update_host:" + str(row_id))
     return {"id": saved}
 
 
@@ -652,9 +640,8 @@ def run_detail(row_id: int):
     return record
 
 
-@app.post("/api/diagnose", dependencies=[Depends(mutation)])
-def diagnose(req: DiagnoseRequest, request: Request):
-    who = security.admin(request)
+@app.post("/api/diagnose")
+def diagnose(req: DiagnoseRequest, who: str = Depends(mutation)):
     security.rate_limit("diagnose:" + who, 30, 60)
     try:
         return diagnostics.run(req.host_id, req.action, req.service, who)

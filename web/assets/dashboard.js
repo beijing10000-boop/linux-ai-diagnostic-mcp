@@ -6,14 +6,8 @@
     keyReady = false,
     running = false,
     currentResult = null,
+    resultRequest = 0,
     raw = false;
-  if ($("today"))
-    $("today").textContent = new Date().toLocaleDateString("zh-CN", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      weekday: "long",
-    });
   function updateHost() {
     const host = hosts.find((h) => h.id === Number($("host").value));
     const proxy = host && proxies.find((p) => p.id === host.proxy_id);
@@ -32,14 +26,14 @@
     try {
       const selected =
         $("host").value || new URLSearchParams(location.search).get("host");
-      const [h, g, p, s] = await Promise.all(
-        ["hosts", "groups", "proxies", "settings"].map((x) => Diag.api(x)),
+      const [h, p, s] = await Promise.all(
+        ["hosts", "proxies", "status"].map((x) => Diag.api(x)),
       );
       hosts = h;
       proxies = p;
-      keyReady = s.ssh_private_key_configured;
+      keyReady = s.ssh_configured;
       $("hostCount").textContent = h.length;
-      $("groupCount").textContent = g.length;
+      $("groupCount").textContent = s.inventory.groups;
       $("proxyCount").textContent = p.length;
       $("proxySummary").textContent =
         `${p.filter((x) => x.status === "configured").length} 个已配置`;
@@ -96,8 +90,10 @@
     $("copyOutput").disabled = false;
     $("outputEmpty").hidden = true;
     $("output").hidden = false;
-    const failed = Boolean(result.error),
-      warning = !failed && (result.truncated || result.exit_code !== 0);
+    const status =
+        meta.status || result.status || (result.error ? "failed" : "success"),
+      failed = status === "failed",
+      warning = status === "warning";
     $("resultBadge").textContent = failed
       ? "执行失败"
       : result.truncated
@@ -121,13 +117,7 @@
     if (!currentResult) return;
     $("output").textContent = raw
       ? JSON.stringify(currentResult, null, 2)
-      : currentResult.error
-        ? Diag.errorMessage(currentResult.error)
-        : (currentResult.output || "（无标准输出）") +
-          (currentResult.stderr
-            ? "\n\n── 标准错误 ──\n" + currentResult.stderr
-            : "") +
-          (currentResult.truncated ? "\n\n[输出超过限制，已保留部分结果]" : "");
+      : Diag.resultText(currentResult);
     $("rawToggle").setAttribute("aria-pressed", String(raw));
   }
   async function loadRuns() {
@@ -150,14 +140,8 @@
           Diag.date(r.time),
           Diag.duration(r.duration_ms),
         ].forEach((t) => tr.append(Diag.node("td", t)));
-        const state = Diag.node("td"),
-          status = Diag.node(
-            "span",
-            { success: "完成", warning: "需关注", failed: "失败" }[r.status] ||
-              r.status,
-            "badge " + r.status,
-          );
-        state.append(status);
+        const state = Diag.node("td");
+        state.append(Diag.statusBadge(r.status));
         tr.append(state);
         const actions = Diag.node("td"),
           button = Diag.node("button", "查看", "text-button");
@@ -173,8 +157,10 @@
                 Diag.toast("诊断执行中，请稍后查看历史");
                 return;
               }
+              const request = ++resultRequest;
               try {
                 const detail = await Diag.api("runs/" + r.id);
+                if (request !== resultRequest) return;
                 renderOutput(detail.result, detail);
                 $("output").focus({ preventScroll: true });
               } catch (e) {
@@ -201,6 +187,7 @@
     const action = $("action").value,
       service = action === "service" ? $("service").value.trim() : null;
     running = true;
+    resultRequest++;
     $("host").disabled = true;
     $("action").disabled = true;
     $("refresh").disabled = true;

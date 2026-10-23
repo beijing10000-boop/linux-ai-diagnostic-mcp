@@ -157,7 +157,11 @@ async function checkOverflow(page) {
     await page.getByRole("button", { name: "完成初始化" }).click();
     await page.locator("#loginLink").waitFor({ state: "visible" });
     assert(await page.locator("#setupForm").isHidden());
-    await page.goto(origin + "/login");
+    assert.equal(
+      await page.locator("#loginLink a").getAttribute("href"),
+      origin + "/login",
+    );
+    await page.locator("#loginLink a").click();
     await page.getByRole("link", { name: "使用飞书账号登录" }).waitFor();
     await screenshot(page, "login-desktop");
     assert.equal(
@@ -287,6 +291,10 @@ async function checkOverflow(page) {
     await page.locator("#run").click();
     await waitText(page, "#resultBadge", "需关注");
     await waitText(page, "#output", "inactive");
+    await page.locator("#action").selectOption("memory");
+    await page.locator("#run").click();
+    await waitText(page, "#resultBadge", "执行失败");
+    await waitText(page, "#output", "free: command not found");
     await page.locator("#action").selectOption("disk");
     assert(await page.locator("#serviceField").isHidden());
     await page.locator("#run").click();
@@ -333,9 +341,9 @@ async function checkOverflow(page) {
     await waitText(page, "#connectionOutput", "load average");
     await screenshot(page, "connections-desktop");
     await page.goto(origin);
-    await waitText(page, "#runTotal", "5");
+    await waitText(page, "#runTotal", "6");
     await page.getByRole("link", { name: "执行失败 · 查看明细 →" }).click();
-    await waitText(page, "#pageSummary", "共 1 条");
+    await waitText(page, "#pageSummary", "共 2 条");
     assert.equal(await page.locator("#runStatus").inputValue(), "failed");
     await page.locator("#historyRows button").first().click();
     await waitText(page, "#runDialogOutput", "超时");
@@ -354,8 +362,11 @@ async function checkOverflow(page) {
       );
     }
     await page.locator("#closeRunDialog").click();
+    await page.locator("#historyRows button").nth(1).click();
+    await waitText(page, "#runDialogOutput", "free: command not found");
+    await page.locator("#closeRunDialog").click();
     await page.locator("#historyFilter button[type=reset]").click();
-    await waitText(page, "#pageSummary", "共 5 条");
+    await waitText(page, "#pageSummary", "共 6 条");
     await Promise.all([
       page.waitForResponse(
         (r) =>
@@ -369,7 +380,7 @@ async function checkOverflow(page) {
     await page.locator("#historyFilter button[type=submit]").click();
     await page.locator("#historyEmpty").waitFor({ state: "visible" });
     await page.locator("#historyFilter button[type=reset]").click();
-    await waitText(page, "#pageSummary", "共 5 条");
+    await waitText(page, "#pageSummary", "共 6 条");
     await waitText(page, "#audit", "诊断主机");
     await page.locator("#auditSearch").fill("unlikely-no-match");
     await page.locator("#auditEmpty").waitFor({ state: "visible" });

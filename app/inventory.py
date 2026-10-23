@@ -150,10 +150,6 @@ def save_group(name: str, description: str, row_id: int | None = None) -> int | 
         ).lastrowid
 
 
-def add_group(name: str, description: str) -> int:
-    return save_group(name, description)
-
-
 def save_proxy(
     name: str,
     description: str = "",
@@ -244,17 +240,6 @@ def save_host(
             VALUES (?,?,?,?,?,?)""",
             values,
         ).lastrowid
-
-
-def add_host(
-    name: str,
-    address: str,
-    port: int,
-    group_id: int | None,
-    proxy_id: int | None,
-    host_key: str,
-) -> int:
-    return save_host(name, address, port, group_id, proxy_id, host_key)
 
 
 def remove(table: str, row_id: int) -> bool:

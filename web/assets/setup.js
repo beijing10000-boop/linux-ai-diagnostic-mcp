@@ -53,6 +53,7 @@
         "初始化完成。请确认飞书后台已配置以上回调地址，再前往登录。";
       form.reset();
       form.hidden = true;
+      document.querySelector("#loginLink a").href = result.login_url;
       document.getElementById("loginLink").hidden = false;
     } catch (err) {
       status.textContent =

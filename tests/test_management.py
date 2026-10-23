@@ -210,6 +210,54 @@ def test_missing_master_does_not_replace_key(configured):
     assert not storage.MASTER.exists() and storage.DB.read_bytes() == before
 
 
+@pytest.mark.parametrize(
+    "action,code,truncated,expected",
+    [
+        ("cpu", 0, False, "success"),
+        ("service", 3, False, "warning"),
+        ("service", 4, False, "failed"),
+        ("memory", 127, False, "failed"),
+        ("disk", 124, False, "failed"),
+        ("cpu", 3, False, "failed"),
+        ("processes", None, True, "warning"),
+        ("processes", 125, True, "warning"),
+    ],
+)
+def test_diagnostic_status_matches_history_and_audit(
+    authorized, monkeypatch, action, code, truncated, expected
+):
+    client, headers = authorized
+    host_id = client.post("/api/hosts", headers=headers, json=host_payload()).json()[
+        "id"
+    ]
+    monkeypatch.setattr(
+        diagnostics,
+        "execute",
+        lambda *_: {
+            "exit_code": code,
+            "output": "partial output",
+            "stderr": "detail",
+            "truncated": truncated,
+        },
+    )
+    response = client.post(
+        "/api/diagnose",
+        headers=headers,
+        json={
+            "host_id": host_id,
+            "action": action,
+            "service": "nginx" if action == "service" else None,
+        },
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert result["status"] == expected and result["exit_code"] == code
+    record = client.get("/api/runs").json()[0]
+    assert record["status"] == expected
+    assert client.get(f"/api/runs/{record['id']}").json()["result"] == result
+    assert client.get("/api/audit").json()[0]["action"].endswith(":" + expected)
+
+
 def test_migrates_legacy_proxy_records(client):
     with storage.connect() as c:
         c.execute("DROP TABLE hosts")

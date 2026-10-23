@@ -8,7 +8,7 @@
 
 ## 内网 HTTP（当前部署方式）
 
-选择独立的 LAN 配置启动，不需要反向代理或证书：
+在仓库根目录选择 LAN 入口启动，不需要反向代理或证书。该入口自动引用 `compose.common.yaml`，请保留仓库中的三个 Compose 文件：
 
 ```bash
 mkdir -p data
@@ -106,9 +106,10 @@ ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
 
 ## 故障与备份
 ```bash
-docker compose logs --tail 100 web
-docker compose ps
+docker compose -f compose.lan.yaml logs --tail 100 web
+docker compose -f compose.lan.yaml ps
 ```
+以上为内网安装命令；本机反向代理安装省略 `-f compose.lan.yaml`。
 需要 **同时备份** `data/master.key` 与 `data/inventory.db`，并设置受保护的备份权限。主密钥丢失将无法解密 App Secret 或 SSH 私钥。不要将 `data` 挂载为公开静态目录。
 
 ## 当前限制
@@ -120,7 +121,7 @@ docker compose ps
 ## 现有安装升级
 
 1. 维护窗口中备份数据库和原始 `master.key`，不要更换或删除主密钥。
-2. 更新仓库代码后执行 `docker compose up -d --build`。
+2. 执行 `git switch main`、`git pull --ff-only` 后，按原部署方式重建容器。内网 HTTP 使用 `docker compose -f compose.lan.yaml up -d --build`；本机反向代理使用 `docker compose up -d --build`。
 3. 启动会自动补齐旧代理的连接字段并创建诊断历史表；原有配置保留。
 4. 在每台目标机重新安装更新后的 `gateway/ai-diagnostic-gateway`（root:root，0755）。
 5. 登录 Web 核对 SSH 配置。旧版本登记的代理需要补齐 IP、公钥和专用私钥。
