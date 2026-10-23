@@ -1,7 +1,414 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>资产管理 · Linux AI Diagnostic</title><link rel="stylesheet" href="/assets/style.css"><script src="/assets/common.js" defer></script><script src="/assets/inventory.js" defer></script></head>
-<body><header class="topbar"><div><a class="brand" href="/">◈ Linux AI Diagnostic <span data-version></span></a><nav class="nav"><a href="/">诊断工作台</a><a href="/inventory">资产与代理</a><a href="/settings">系统设置</a></nav></div></header>
-<main class="container"><div class="headline"><div><div class="eyebrow">Infrastructure / 资产管理</div><h1>主机、主机组与代理</h1><p class="muted">统一维护服务器清单、主机公钥与组织结构</p></div><button id="refresh" class="secondary">刷新资产</button></div><p id="status" class="status"></p>
-<div class="grid"><section class="card"><h2>新建主机组</h2><form id="groupForm"><label>名称<input name="name" required maxlength="80" placeholder="生产环境"></label><label>描述<input name="description" maxlength="500" placeholder="用于分类与资产管理"></label><button class="full">创建主机组</button></form><div id="groups"></div></section>
-<section class="card"><h2>登记代理节点</h2><form id="proxyForm"><label>代理名称<input name="name" required maxlength="80" placeholder="机房 A 代理"></label><label>所属网络或说明<input name="description" maxlength="500" placeholder="仅用于资产登记"></label><button class="full">添加代理</button></form><p class="notice">v0.1.0 尚未启用分布式代理调度；关联代理的主机不能执行诊断。</p><div id="proxies"></div></section>
-<section class="card"><h2>添加 Linux 主机</h2><form id="hostForm"><label>主机名称<input name="name" required maxlength="80" placeholder="web-01"></label><div class="form-cols"><div><label>内网 IP<input name="address" required placeholder="172.20.1.10"></label></div><div><label>SSH 端口<input name="ssh_port" type="number" min="1" max="65535" value="22" required></label></div></div><label>主机组<select name="group_id" id="groupSelect"><option value="">不分组</option></select></label><label>代理<select name="proxy_id" id="proxySelect"><option value="">直连</option></select></label><label>SSH 主机公钥（必须核对）<textarea name="host_key" required placeholder="ssh-ed25519 AAAAC3Nz..." rows="3"></textarea></label><small>必须从可信渠道核对完整公钥或指纹，不要直接信任未经核对的 ssh-keyscan 输出。</small><button class="full">添加主机</button></form></section>
-<section class="card wide"><h2>主机清单</h2><div id="hosts"></div></section></div><p class="footnote">只允许添加 RFC1918 IPv4 或 IPv6 ULA 地址，禁止将 SSH 诊断指向公网目标。</p></main></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>主机与代理 · Linux AI Diagnostic</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script defer src="/assets/common.js"></script>
+    <script defer src="/assets/inventory.js"></script>
+  </head>
+  <body data-page="inventory">
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <aside class="sidebar" id="appSidebar" aria-label="工作空间导航"></aside>
+    <div class="workspace">
+      <header class="topbar" id="appHeader"></header>
+      <main class="container" id="main">
+        <div class="page-actions">
+          <p class="sub">
+            维护主机清单、主机组和 SSH 跳板代理；连接前固定主机公钥。
+          </p>
+          <button id="refresh" class="secondary">
+            <svg class="icon" aria-hidden="true">
+              <use href="/assets/icons.svg#refresh"></use>
+            </svg>
+            刷新资产
+          </button>
+        </div>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+        <section class="card inventory-card">
+          <div class="inventory-tabs" role="tablist" aria-label="资产类型">
+            <button
+              class="tab active"
+              id="tab-hosts"
+              role="tab"
+              aria-controls="assetPanel"
+              aria-selected="true"
+              data-tab="hosts"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#server"></use>
+              </svg>
+              Linux 主机 <span id="count-hosts">0</span></button
+            ><button
+              class="tab"
+              id="tab-groups"
+              role="tab"
+              aria-controls="assetPanel"
+              aria-selected="false"
+              data-tab="groups"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#folder"></use>
+              </svg>
+              主机组 <span id="count-groups">0</span></button
+            ><button
+              class="tab"
+              id="tab-proxies"
+              role="tab"
+              aria-controls="assetPanel"
+              aria-selected="false"
+              data-tab="proxies"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#route"></use>
+              </svg>
+              跳板代理 <span id="count-proxies">0</span>
+            </button>
+          </div>
+          <div class="asset-toolbar">
+            <div class="search-field">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#search"></use></svg
+              ><input
+                id="search"
+                type="search"
+                aria-label="搜索资产"
+                placeholder="搜索主机名称或 IP…"
+              />
+            </div>
+            <select id="groupFilter" aria-label="按主机组筛选">
+              <option value="">全部主机组</option></select
+            ><button id="addAsset" class="primary">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#plus"></use>
+              </svg>
+              <span>添加主机</span>
+            </button>
+          </div>
+          <div id="assetPanel" role="tabpanel" aria-labelledby="tab-hosts">
+            <div id="assetTable" class="table-scroll"></div>
+            <div id="assetEmpty" class="empty-state" hidden>
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#server"></use>
+              </svg>
+              <h3 id="emptyTitle">添加第一台 Linux 主机</h3>
+              <p id="emptyDescription">
+                登记私有 IP 和已核验的 SSH 主机公钥，即可开始诊断。
+              </p>
+              <button id="emptyAdd" class="secondary">
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#plus"></use>
+                </svg>
+                添加资产
+              </button>
+            </div>
+          </div>
+          <div class="table-footer">
+            <span id="assetSummary">正在读取资产…</span
+            ><span>凭据加密保存</span>
+          </div>
+        </section>
+        <div class="connection-note">
+          <svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#route"></use>
+          </svg>
+          <div>
+            <strong>按网络选择连接方式</strong>
+            <p>
+              可直达的主机使用直连；跨网段主机可通过 SSH
+              跳板代理连接。两端公钥均需独立核验。
+            </p>
+          </div>
+        </div>
+        <dialog
+          id="hostDialog"
+          class="editor-dialog"
+          aria-labelledby="hostDialogTitle"
+        >
+          <form id="hostForm">
+            <div class="dialog-heading">
+              <div>
+                <div class="eyebrow">LINUX HOST</div>
+                <h2 id="hostDialogTitle">添加主机</h2>
+              </div>
+              <button
+                type="button"
+                class="icon-button"
+                data-close
+                aria-label="关闭"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#close"></use>
+                </svg>
+              </button>
+            </div>
+            <div class="dialog-body">
+              <label for="hostName">主机名称</label
+              ><input
+                id="hostName"
+                name="name"
+                required
+                maxlength="80"
+                placeholder="例如 production-web-01"
+              />
+              <div class="form-cols">
+                <div>
+                  <label for="hostAddress">私有 IP 地址</label
+                  ><input
+                    id="hostAddress"
+                    name="address"
+                    required
+                    maxlength="64"
+                    placeholder="172.20.1.10"
+                  />
+                </div>
+                <div>
+                  <label for="hostPort">SSH 端口</label
+                  ><input
+                    id="hostPort"
+                    name="ssh_port"
+                    type="number"
+                    value="22"
+                    min="1"
+                    max="65535"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="form-cols">
+                <div>
+                  <label for="groupSelect">主机组</label
+                  ><select id="groupSelect" name="group_id">
+                    <option value="">不分组</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="proxySelect">连接方式</label
+                  ><select id="proxySelect" name="proxy_id">
+                    <option value="">直连</option>
+                  </select>
+                </div>
+              </div>
+              <label for="hostKey">SSH 主机公钥</label
+              ><textarea
+                id="hostKey"
+                name="host_key"
+                required
+                maxlength="2500"
+                rows="3"
+                class="mono"
+                placeholder="ssh-ed25519 AAAAC3Nz…"
+                spellcheck="false"
+              ></textarea>
+              <p class="field-hint">
+                通过可信控制台读取
+                /etc/ssh/ssh_host_ed25519_key.pub，并核验指纹。支持公钥末尾的备注。
+              </p>
+              <div class="notice">
+                目标端需要安装强制命令网关，并为诊断专用公钥设置 authorized_keys
+                限制。
+              </div>
+              <p id="hostFormStatus" class="status" role="alert"></p>
+            </div>
+            <div class="dialog-footer">
+              <button type="button" class="secondary" data-close>取消</button
+              ><button type="submit" class="primary">保存主机</button>
+            </div>
+          </form>
+        </dialog>
+        <dialog
+          id="groupDialog"
+          class="editor-dialog compact-dialog"
+          aria-labelledby="groupDialogTitle"
+        >
+          <form id="groupForm">
+            <div class="dialog-heading">
+              <div>
+                <div class="eyebrow">HOST GROUP</div>
+                <h2 id="groupDialogTitle">新建主机组</h2>
+              </div>
+              <button
+                type="button"
+                class="icon-button"
+                data-close
+                aria-label="关闭"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#close"></use>
+                </svg>
+              </button>
+            </div>
+            <div class="dialog-body">
+              <label for="groupName">主机组名称</label
+              ><input
+                id="groupName"
+                name="name"
+                required
+                maxlength="80"
+                placeholder="例如生产环境"
+              /><label for="groupDescription"
+                >描述 <span class="optional">可选</span></label
+              ><textarea
+                id="groupDescription"
+                name="description"
+                maxlength="500"
+                rows="3"
+                placeholder="说明这个组的用途"
+              ></textarea>
+              <p id="groupFormStatus" class="status" role="alert"></p>
+            </div>
+            <div class="dialog-footer">
+              <button type="button" class="secondary" data-close>取消</button
+              ><button type="submit" class="primary">保存主机组</button>
+            </div>
+          </form>
+        </dialog>
+        <dialog
+          id="proxyDialog"
+          class="editor-dialog"
+          aria-labelledby="proxyDialogTitle"
+        >
+          <form id="proxyForm">
+            <div class="dialog-heading">
+              <div>
+                <div class="eyebrow">SSH JUMP PROXY</div>
+                <h2 id="proxyDialogTitle">添加跳板代理</h2>
+              </div>
+              <button
+                type="button"
+                class="icon-button"
+                data-close
+                aria-label="关闭"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#close"></use>
+                </svg>
+              </button>
+            </div>
+            <div class="dialog-body">
+              <div class="form-cols">
+                <div>
+                  <label for="proxyName">代理名称</label
+                  ><input
+                    id="proxyName"
+                    name="name"
+                    required
+                    maxlength="80"
+                    placeholder="例如 D3 机房"
+                  />
+                </div>
+                <div>
+                  <label for="proxyDescription"
+                    >描述 <span class="optional">可选</span></label
+                  ><input
+                    id="proxyDescription"
+                    name="description"
+                    maxlength="500"
+                    placeholder="机房或所属网段"
+                  />
+                </div>
+              </div>
+              <div class="form-cols">
+                <div>
+                  <label for="proxyAddress">代理私有 IP</label
+                  ><input
+                    id="proxyAddress"
+                    name="address"
+                    required
+                    maxlength="64"
+                    placeholder="172.20.200.10"
+                  />
+                </div>
+                <div>
+                  <label for="proxyPort">SSH 端口</label
+                  ><input
+                    id="proxyPort"
+                    name="ssh_port"
+                    type="number"
+                    value="22"
+                    min="1"
+                    max="65535"
+                    required
+                  />
+                </div>
+              </div>
+              <label for="proxyUsername">SSH 用户名</label
+              ><input
+                id="proxyUsername"
+                name="username"
+                required
+                value="diag-proxy"
+                maxlength="32"
+                pattern="[a-zA-Z_][a-zA-Z0-9_.-]*"
+              /><label for="proxyHostKey">代理 SSH 主机公钥</label
+              ><textarea
+                id="proxyHostKey"
+                name="host_key"
+                class="mono"
+                required
+                maxlength="2500"
+                rows="2"
+                placeholder="ssh-ed25519 AAAAC3Nz…"
+                spellcheck="false"
+              ></textarea
+              ><label for="proxyPrivateKey"
+                >代理专用 Ed25519 私钥
+                <span id="proxyKeyHint" class="optional"></span></label
+              ><textarea
+                id="proxyPrivateKey"
+                name="private_key"
+                class="mono"
+                maxlength="20000"
+                rows="3"
+                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                spellcheck="false"
+                autocomplete="off"
+              ></textarea
+              ><label for="proxyPassphrase"
+                >私钥口令 <span class="optional">如有</span></label
+              ><input
+                id="proxyPassphrase"
+                name="passphrase"
+                type="password"
+                maxlength="1000"
+                autocomplete="new-password"
+              />
+              <div class="notice">
+                跳板账号需允许到指定目标 SSH 端口的 direct-tcpip
+                转发。目标主机仍使用独立的 root 诊断密钥。
+              </div>
+              <p id="proxyFormStatus" class="status" role="alert"></p>
+            </div>
+            <div class="dialog-footer">
+              <button type="button" class="secondary" data-close>取消</button
+              ><button type="submit" class="primary">保存代理</button>
+            </div>
+          </form>
+        </dialog>
+        <dialog
+          id="confirmDialog"
+          class="editor-dialog compact-dialog"
+          aria-labelledby="confirmTitle"
+        >
+          <div class="dialog-heading"><h2 id="confirmTitle">删除资产</h2></div>
+          <div class="dialog-body">
+            <p id="confirmText"></p>
+            <p id="confirmStatus" class="status" role="alert"></p>
+          </div>
+          <div class="dialog-footer">
+            <button id="cancelDelete" class="secondary">取消</button
+            ><button id="confirmDelete" class="danger">确认删除</button>
+          </div>
+        </dialog>
+        <footer>
+          <span>Linux AI Diagnostic · 只读诊断平台</span
+          ><span>所有诊断操作均记录审计</span>
+        </footer>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

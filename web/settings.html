@@ -1,7 +1,224 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>系统设置 · Linux AI Diagnostic</title><link rel="stylesheet" href="/assets/style.css"><script src="/assets/common.js" defer></script><script src="/assets/settings.js" defer></script></head>
-<body><header class="topbar"><div><a class="brand" href="/">◈ Linux AI Diagnostic <span data-version></span></a><nav class="nav"><a href="/">诊断工作台</a><a href="/inventory">资产与代理</a><a href="/settings">系统设置</a></nav></div></header>
-<main class="container"><div class="headline"><div><div class="eyebrow">Security / 管理配置</div><h1>系统设置与访问控制</h1><p class="muted">所有业务设置通过 Web 更新，敏感材料加密保存且不会回显</p></div></div><p id="status" class="status"></p><div class="grid grid-2">
-<section class="card"><h2>飞书登录配置</h2><label>飞书 App ID<input id="app_id" autocomplete="off"></label><label>管理员 Open ID<input id="admin_open_id" autocomplete="off"></label><label>公网 HTTPS Origin<input id="public_url" placeholder="https://diag.example.com"></label><label>轮换 App Secret（留空表示不修改）<input id="app_secret" type="password" autocomplete="new-password"></label><button id="saveSettings">保存飞书设置</button><p class="notice">更新 App ID、Secret 或管理员 Open ID 会使所有当前会话失效，需要重新登录。变更域名时也要更新飞书回调 URL。</p></section>
-<section class="card"><h2>SSH root 专用密钥</h2><p id="sshStatus" class="pill">读取中</p><p class="muted">仅支持 Ed25519 私钥。密钥不会写入 .env 或作为命令行参数传递。</p><label>粘贴完整 SSH 私钥<textarea id="ssh_key" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" spellcheck="false"></textarea></label><label>私钥解密口令（如有）<input id="ssh_passphrase" type="password" autocomplete="new-password"></label><button id="saveSSH">加密保存 SSH 密钥</button><p class="notice">服务器仍必须使用 SSH authorized_keys 强制命令网关；这不是一个真正只读的 root 账号。</p></section>
-<section class="card wide"><div class="controls"><h2>最近安全审计</h2><button id="logout" class="secondary">退出飞书登录</button></div><div class="table-scroll"><table><thead><tr><th>时间</th><th>用户 Open ID</th><th>操作</th></tr></thead><tbody id="audit"></tbody></table></div></section>
-</div></main></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>系统配置 · Linux AI Diagnostic</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script defer src="/assets/common.js"></script>
+    <script defer src="/assets/settings.js"></script>
+  </head>
+  <body data-page="settings">
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <aside class="sidebar" id="appSidebar" aria-label="工作空间导航"></aside>
+    <div class="workspace">
+      <header class="topbar" id="appHeader"></header>
+      <main class="container" id="main">
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>系统配置</h2>
+              <p class="sub">
+                管理访问方式、飞书登录和 SSH 凭据。敏感内容保存后不会回显。
+              </p>
+            </div>
+            <button id="reloadSettings" class="secondary">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#refresh"></use>
+              </svg>
+              重新读取
+            </button>
+          </div>
+          <div class="info">
+            当前支持内网
+            HTTP。修改访问协议或地址后，请同步更新飞书回调地址；实际变更登录配置将注销当前会话。HTTPS
+            证书与入口由服务器配置。
+          </div>
+          <form id="settingsForm">
+            <h3 class="ops-section-title">平台与访问</h3>
+            <div class="form-cols">
+              <div>
+                <label for="web_protocol">Web 访问协议</label
+                ><select id="web_protocol">
+                  <option value="http">HTTP（内网访问）</option>
+                  <option value="https">HTTPS</option>
+                </select>
+              </div>
+              <div>
+                <label for="web_public_host">访问地址（IP / 域名与端口）</label
+                ><input
+                  id="web_public_host"
+                  required
+                  placeholder="172.20.200.100:9099"
+                  maxlength="250"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+            <input type="hidden" id="public_url" name="public_url" />
+            <div class="callback-box">
+              <span>飞书重定向 URL</span><code id="callbackUrl">正在读取…</code
+              ><button
+                id="copyCallback"
+                type="button"
+                class="icon-button"
+                aria-label="复制回调地址"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#copy"></use>
+                </svg>
+              </button>
+            </div>
+            <h3 class="ops-section-title">飞书登录与管理员</h3>
+            <div class="form-cols">
+              <div>
+                <label for="app_id">飞书 App ID</label
+                ><input
+                  id="app_id"
+                  required
+                  pattern="cli_[A-Za-z0-9]{8,80}"
+                  maxlength="84"
+                  autocomplete="off"
+                  placeholder="cli_…"
+                />
+              </div>
+              <div>
+                <label for="admin_open_id">管理员 Open ID</label
+                ><input
+                  id="admin_open_id"
+                  required
+                  pattern="ou_[A-Za-z0-9_\-]{8,150}"
+                  maxlength="153"
+                  autocomplete="off"
+                  placeholder="ou_…"
+                />
+              </div>
+              <div>
+                <label for="app_secret">飞书 App Secret</label
+                ><input
+                  id="app_secret"
+                  type="password"
+                  minlength="10"
+                  maxlength="300"
+                  autocomplete="new-password"
+                />
+                <p id="feishuSecretHint" class="field-hint">
+                  留空保持已保存的 Secret
+                </p>
+              </div>
+              <div class="field-summary">
+                <strong>身份与权限</strong>
+                <p class="sub">
+                  仅允许配置的飞书管理员访问。初始化、设置变更和 SSH
+                  诊断采用独立的会话与权限校验。
+                </p>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="saveSettings" class="primary" type="submit">
+                保存配置
+              </button>
+            </div>
+            <p id="settingsStatus" class="status" role="status"></p>
+          </form>
+        </section>
+        <section class="card" id="ssh">
+          <div class="section-heading">
+            <div>
+              <h2>SSH 诊断凭据</h2>
+              <p class="sub">
+                目标主机使用专用 root 密钥；跳板代理的独立密钥在资产管理中配置。
+              </p>
+            </div>
+            <span class="badge neutral" id="sshStatus">正在检查…</span>
+          </div>
+          <form id="sshForm">
+            <div class="form-cols">
+              <div>
+                <label for="ssh_key">新的 Ed25519 私钥</label
+                ><textarea
+                  id="ssh_key"
+                  name="private_key"
+                  class="mono"
+                  minlength="80"
+                  maxlength="20000"
+                  rows="6"
+                  required
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                ></textarea>
+                <p class="field-hint">
+                  仅录入诊断专用私钥。保存后输入框清空，当前密钥不会回显。
+                </p>
+              </div>
+              <div>
+                <label for="ssh_passphrase">私钥解密口令（如有）</label
+                ><input
+                  id="ssh_passphrase"
+                  type="password"
+                  maxlength="1000"
+                  autocomplete="new-password"
+                />
+                <div class="info credential-note">
+                  目标服务器仍需为这把密钥的公钥配置强制命令网关。root
+                  账号的操作范围由目标端网关限制。
+                </div>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="saveSSH" type="submit" class="primary">
+                加密保存 SSH 凭据</button
+              ><a class="secondary" href="/connections">前往连接调试</a>
+            </div>
+            <p id="sshSaveStatus" class="status" role="status"></p>
+          </form>
+          <details class="help-details">
+            <summary>查看诊断公钥与部署说明</summary>
+            <label for="sshPublicKey">诊断公钥（可部署到目标端）</label
+            ><textarea
+              id="sshPublicKey"
+              class="mono"
+              rows="3"
+              readonly
+              placeholder="保存有效私钥后显示对应公钥"
+            ></textarea>
+            <div class="actions">
+              <button id="copyPublicKey" class="secondary" type="button">
+                <svg class="icon" aria-hidden="true">
+                  <use href="/assets/icons.svg#copy"></use>
+                </svg>
+                复制公钥</button
+              ><span class="sub mono" id="sshFingerprint"></span>
+            </div>
+            <p class="sub">
+              通过可信控制台读取目标主机的
+              /etc/ssh/ssh_host_ed25519_key.pub，并在资产管理中核验和固定它。诊断公钥与目标主机公钥用途不同。
+            </p>
+          </details>
+        </section>
+        <section class="card">
+          <h2>操作审计</h2>
+          <p class="sub">
+            配置修改、飞书登录与诊断结果统一记录，可在任务与审计中筛选查看。
+          </p>
+          <div class="actions">
+            <a class="secondary" href="/activity"
+              >打开任务与审计
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#arrow"></use></svg
+            ></a>
+          </div>
+        </section>
+        <footer>
+          <span>Linux AI Diagnostic · 只读诊断平台</span
+          ><span>所有诊断操作均记录审计</span>
+        </footer>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

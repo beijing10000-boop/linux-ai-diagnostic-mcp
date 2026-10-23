@@ -7,6 +7,7 @@ APP_ID = "cli_1234567890abc"
 OPEN_ID = "ou_1234567890abcdefgh"
 PUBLIC_URL = "https://diag.example.com"
 
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "DATA", tmp_path)
@@ -16,14 +17,23 @@ def client(tmp_path, monkeypatch):
     with TestClient(app, base_url=PUBLIC_URL) as c:
         yield c
 
+
 @pytest.fixture
 def configured(client):
     token = storage.BOOTSTRAP.read_text()
-    resp = client.post("/setup", json={"bootstrap_token": token, "app_id": APP_ID,
-        "app_secret": "a_fake_secret_for_unit_tests_only",
-        "admin_open_id": OPEN_ID, "public_url": PUBLIC_URL})
+    resp = client.post(
+        "/setup",
+        json={
+            "bootstrap_token": token,
+            "app_id": APP_ID,
+            "app_secret": "a_fake_secret_for_unit_tests_only",
+            "admin_open_id": OPEN_ID,
+            "public_url": PUBLIC_URL,
+        },
+    )
     assert resp.status_code == 200, resp.text
     return client
+
 
 @pytest.fixture
 def authorized(configured):

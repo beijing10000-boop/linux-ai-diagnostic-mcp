@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && mkdir -p /app/data && chown 10001:10001 /app/data
 COPY app ./app
 COPY web ./web
+COPY VERSION .
 USER 10001:10001
 EXPOSE 9099
 CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","9099","--no-proxy-headers","--no-server-header"]

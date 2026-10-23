@@ -10,9 +10,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -34,8 +39,43 @@ jobs:
       - name: Regression tests
         run: pytest -q
 
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: pip install -r requirements-dev.txt
+      - run: npm ci
+      - run: npm run check:web
+      - run: npx playwright install --with-deps --only-shell chromium
+      - name: Browser regression against isolated HTTPS fixture
+        run: npm run test:ui
+        env:
+          DIAG_PYTHON: python
+      - name: Browser regression against LAN HTTP fixture
+        run: npm run test:ui
+        env:
+          DIAG_PYTHON: python
+          DIAG_UI_PROTOCOL: http
+          DIAG_UI_ARTIFACTS: ui-artifacts/http
+      - name: Upload UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-console-screenshots
+          path: ui-artifacts/
+          retention-days: 7
+
   docker-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Prepare persistent data ownership
@@ -44,7 +84,9 @@ jobs:
           sudo chown 10001:10001 data
           sudo chmod 700 data
       - name: Verify Compose
-        run: docker compose config --quiet
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.lan.yaml config --quiet
       - name: Start development container
         run: docker compose up -d --build
       - name: Check port 9099 and one-time bootstrap
@@ -55,7 +97,7 @@ jobs:
             fi
             sleep 2
           done
-          python -c 'import json; assert json.load(open("/tmp/health.json"))["version"] == "0.1.0"'
+          python -c 'import json; from pathlib import Path; assert json.load(open("/tmp/health.json"))["version"] == Path("VERSION").read_text().strip()'
           docker compose exec -T web test -s /app/data/bootstrap.token
           test "$(docker compose port web 9099)" = "127.0.0.1:9099"
       - name: Docker logs on failure

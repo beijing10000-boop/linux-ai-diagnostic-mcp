@@ -1,0 +1,8 @@
+# LAN HTTP entry point: docker compose -f compose.lan.yaml up -d --build
+services:
+  web:
+    extends:
+      file: compose.common.yaml
+      service: web
+    ports:
+      - "0.0.0.0:9099:9099"

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>任务与审计 · Linux AI Diagnostic</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script defer src="/assets/common.js"></script>
+    <script defer src="/assets/activity.js"></script>
+  </head>
+  <body data-page="activity">
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <aside class="sidebar" id="appSidebar" aria-label="工作空间导航"></aside>
+    <div class="workspace">
+      <header class="topbar" id="appHeader"></header>
+      <main class="container" id="main">
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>诊断任务概览</h2>
+              <p class="sub">
+                按保留的诊断记录统计；历史失败不表示主机当前仍有故障。
+              </p>
+            </div>
+            <button id="refreshActivity" class="secondary">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#refresh"></use>
+              </svg>
+              刷新记录
+            </button>
+          </div>
+          <div class="run-summary-grid" id="runSummary"></div>
+        </section>
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>诊断任务记录</h2>
+              <p class="sub">
+                按时间倒序展示，支持状态与主机筛选、分页和结果回看。
+              </p>
+            </div>
+          </div>
+          <form id="historyFilter" class="asset-toolbar history-toolbar">
+            <div>
+              <label for="runSearch">主机名称</label
+              ><input
+                id="runSearch"
+                type="search"
+                maxlength="80"
+                placeholder="输入主机名"
+              />
+            </div>
+            <div>
+              <label for="runStatus">执行状态</label
+              ><select id="runStatus">
+                <option value="all">全部状态</option>
+                <option value="success">执行完成</option>
+                <option value="warning">需要关注</option>
+                <option value="failed">执行失败</option>
+              </select>
+            </div>
+            <div>
+              <label for="runPageSize">每页记录</label
+              ><select id="runPageSize">
+                <option value="20">20 条</option>
+                <option value="50">50 条</option>
+                <option value="100">100 条</option>
+              </select>
+            </div>
+            <button class="primary" type="submit">查询</button
+            ><button class="secondary" type="reset">重置</button>
+          </form>
+          <p id="historyStatus" class="status" role="status"></p>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间（北京时间）</th>
+                  <th>目标主机</th>
+                  <th>诊断项目</th>
+                  <th>执行状态</th>
+                  <th>耗时</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="historyRows"></tbody>
+            </table>
+          </div>
+          <p id="historyEmpty" class="empty-inline" hidden>
+            暂无符合条件的诊断记录
+          </p>
+          <div class="pagination">
+            <span id="pageSummary" class="sub">正在读取…</span>
+            <div>
+              <button id="previousPage" class="secondary" disabled>
+                上一页</button
+              ><button id="nextPage" class="secondary" disabled>下一页</button>
+            </div>
+          </div>
+        </section>
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>操作审计</h2>
+              <p class="sub">最近 100 条登录、配置、资产与诊断操作记录。</p>
+            </div>
+            <div class="search-field audit-search">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#search"></use></svg
+              ><input
+                id="auditSearch"
+                type="search"
+                aria-label="筛选审计日志"
+                placeholder="筛选用户或操作…"
+              />
+            </div>
+            <button id="refreshAudit" class="secondary">刷新审计</button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间（北京时间）</th>
+                  <th>操作人</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="audit"></tbody>
+            </table>
+          </div>
+          <p id="auditEmpty" class="empty-inline" hidden>暂无匹配的审计记录</p>
+          <p id="auditStatus" class="status" role="status"></p>
+        </section>
+        <dialog
+          id="runDialog"
+          class="editor-dialog result-dialog"
+          aria-labelledby="runDialogTitle"
+        >
+          <div class="dialog-heading">
+            <div>
+              <h2 id="runDialogTitle">诊断结果</h2>
+              <p class="sub" id="runDialogMeta"></p>
+            </div>
+            <button
+              id="closeRunDialog"
+              class="icon-button"
+              aria-label="关闭诊断结果"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#close"></use>
+              </svg>
+            </button>
+          </div>
+          <div class="dialog-body">
+            <p id="runDialogStatus" class="status" role="status"></p>
+            <pre id="runDialogOutput" class="result-output" tabindex="0"></pre>
+          </div>
+          <div class="dialog-footer">
+            <button id="toggleRunJSON" class="secondary">JSON</button
+            ><button id="copyRunResult" class="primary">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#copy"></use>
+              </svg>
+              复制结果
+            </button>
+          </div>
+        </dialog>
+        <footer>
+          <span>Linux AI Diagnostic · 只读诊断平台</span
+          ><span>所有诊断操作均记录审计</span>
+        </footer>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

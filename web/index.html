@@ -1,7 +1,132 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>诊断工作台 · Linux AI Diagnostic</title><link rel="stylesheet" href="/assets/style.css"><script src="/assets/common.js" defer></script><script src="/assets/dashboard.js" defer></script></head>
-<body><header class="topbar"><div><a class="brand" href="/">◈ Linux AI Diagnostic <span data-version></span></a><nav class="nav"><a href="/">诊断工作台</a><a href="/inventory">资产与代理</a><a href="/settings">系统设置</a></nav></div></header>
-<main class="container"><div class="headline"><div><div class="eyebrow">Overview / 管理控制台</div><h1>服务器诊断工作台</h1><p class="muted">SSH 公钥校验 · root 强制命令 · 只读诊断</p></div><span class="pill">安全策略已启用</span></div>
-<div class="grid"><section class="card"><div class="muted">Linux 主机</div><div class="stat" id="hostCount">—</div><small>已登记主机</small></section><section class="card"><div class="muted">主机组</div><div class="stat" id="groupCount">—</div><small>分类管理</small></section><section class="card"><div class="muted">代理节点</div><div class="stat" id="proxyCount">—</div><small>代理执行尚未启用</small></section>
-<section class="card span-2"><h2>发起远程诊断</h2><p class="notice">只允许诊断已登记的私有 IP，必须预先固定 SSH 主机公钥。任何根账号任意 Shell、文件写入及代理任务转发均不开放。</p><label for="host">目标主机</label><select id="host"><option value="">请选择已登记主机</option></select><div class="form-cols"><div><label for="action">诊断项目</label><select id="action"><option value="cpu">CPU 负载</option><option value="memory">内存</option><option value="disk">磁盘</option><option value="network">网络接口</option><option value="sockets">网络连接</option><option value="processes">进程</option><option value="service">服务状态</option></select></div><div><label for="service">服务名（仅服务状态使用）</label><input id="service" placeholder="nginx"></div></div><button id="run">开始诊断</button><p id="notice" class="status"></p></section>
-<section class="card"><h2>运行说明</h2><p>Web 使用飞书管理员 Open ID 登录，所有诊断请求同时校验浏览器会话与 CSRF Token。</p><p>SSH 私钥通过“系统设置”录入，以密文存储；目标服务器必须已安装诊断网关。</p><p class="muted">部署默认端口：9099</p></section>
-<section class="card wide"><h2>诊断结果</h2><pre id="output">请选择主机与诊断项目。</pre></section></div><p class="footnote">Linux AI Diagnostic · v0.1.0 开发版本 · 未通过生产安全验收</p></main></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>总览仪表盘 · Linux AI Diagnostic</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script defer src="/assets/common.js"></script>
+    <script defer src="/assets/overview.js"></script>
+  </head>
+  <body data-page="overview">
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <aside class="sidebar" id="appSidebar" aria-label="工作空间导航"></aside>
+    <div class="workspace">
+      <header class="topbar" id="appHeader"></header>
+      <main class="container" id="main">
+        <div id="loadError" class="notice error" role="alert" hidden></div>
+        <div class="stats overview-stats">
+          <section class="stat-card">
+            <div class="stat-label">配置数据库</div>
+            <strong id="dbState">—</strong>
+            <div class="stat-foot">平台数据存储状态</div>
+          </section>
+          <a class="stat-card" href="/settings#ssh"
+            ><div class="stat-label">SSH 凭据</div>
+            <strong id="sshState">—</strong>
+            <div class="stat-foot">查看或更新专用密钥 →</div></a
+          ><a class="stat-card" href="/inventory"
+            ><div class="stat-label">已登记主机</div>
+            <strong id="hostCount">—</strong>
+            <div id="hostSummary" class="stat-foot">读取连接配置…</div></a
+          ><a class="stat-card" href="/inventory#proxies"
+            ><div class="stat-label">跳板代理</div>
+            <strong id="proxyCount">—</strong>
+            <div id="proxySummary" class="stat-foot">读取代理配置…</div></a
+          >
+        </div>
+        <div class="stats overview-stats">
+          <a class="stat-card metric" href="/activity"
+            ><div class="stat-label">诊断任务 · 查看明细 →</div>
+            <strong id="runTotal">—</strong>
+            <div class="stat-foot">最近保留的诊断记录</div></a
+          ><a class="stat-card metric" href="/activity?status=success"
+            ><div class="stat-label">执行完成 · 查看明细 →</div>
+            <strong id="runSuccess" class="positive">—</strong>
+            <div class="stat-foot">退出状态 0 且输出完整</div></a
+          ><a class="stat-card metric" href="/activity?status=warning"
+            ><div class="stat-label">需要关注 · 查看明细 →</div>
+            <strong id="runWarning" class="warning-text">—</strong>
+            <div class="stat-foot">服务非活动或输出已截断</div></a
+          ><a class="stat-card metric" href="/activity?status=failed"
+            ><div class="stat-label">执行失败 · 查看明细 →</div>
+            <strong id="runFailed" class="error">—</strong>
+            <div class="stat-foot">连接、配置或执行失败</div></a
+          >
+        </div>
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>服务健康概览</h2>
+              <p class="sub">配置数据库、SSH 凭据与资产准备情况。</p>
+            </div>
+            <button id="refreshOverview" class="secondary">
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#refresh"></use>
+              </svg>
+              刷新状态
+            </button>
+          </div>
+          <div id="readiness" class="readiness-grid"></div>
+          <p id="overviewStatus" class="status" role="status"></p>
+          <div class="actions">
+            <a class="primary" href="/diagnostics"
+              >开始只读诊断
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#arrow"></use></svg></a
+            ><a class="secondary" href="/connections">打开连接调试</a
+            ><a class="secondary" href="/settings">系统配置</a>
+          </div>
+        </section>
+        <section class="card">
+          <div class="section-heading">
+            <div>
+              <h2>最近诊断</h2>
+              <p class="sub">按执行时间倒序展示，查看任务可回看完整结果。</p>
+            </div>
+            <a class="text-link" href="/activity"
+              >全部任务
+              <svg class="icon" aria-hidden="true">
+                <use href="/assets/icons.svg#arrow"></use></svg
+            ></a>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>主机</th>
+                  <th>诊断项目</th>
+                  <th>时间（北京时间）</th>
+                  <th>耗时</th>
+                  <th>结果</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="recentRuns"></tbody>
+            </table>
+          </div>
+          <p id="recentEmpty" class="empty-inline" hidden>
+            暂无诊断任务。先配置 SSH 密钥并添加主机，再发起诊断。
+          </p>
+        </section>
+        <section class="card">
+          <h2>诊断范围</h2>
+          <p class="info">
+            通过专用 SSH 密钥执行
+            CPU、内存、磁盘、网络、进程与服务状态等固定查询。目标端使用强制命令网关限制动作；跳板代理和目标服务器分别核验公钥。
+          </p>
+          <p class="sub panel-note">
+            当前统计基于最近保留的 500 条任务记录；尚未测试的主机不标记为在线。
+          </p>
+        </section>
+        <footer>
+          <span>Linux AI Diagnostic · 只读诊断平台</span
+          ><span>所有诊断操作均记录审计</span>
+        </footer>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

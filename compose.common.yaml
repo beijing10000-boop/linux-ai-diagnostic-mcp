@@ -1,0 +1,20 @@
+# Shared container configuration; choose compose.yaml or compose.lan.yaml to start.
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:9099/healthz',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

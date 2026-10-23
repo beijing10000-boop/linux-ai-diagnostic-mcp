@@ -1,1 +1,33 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>飞书登录 · Linux AI Diagnostic</title><link rel="stylesheet" href="/assets/style.css"></head><body><main class="auth-page"><section class="card auth-card"><div class="eyebrow">Secure Sign-in · 管理员验证</div><h1>◈ Linux AI Diagnostic</h1><p>使用飞书 Open ID 验证管理员身份。</p><p class="muted">只允许系统初始化时设置的管理员账号登录。Web、诊断 API 和资产操作统一校验会话与权限。</p><a class="pill" href="/auth/feishu">使用飞书登录 →</a><p class="footnote">v0.1.0 · SSH 管理与诊断仅允许已授权主机</p></section></main></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>飞书登录 · Linux AI Diagnostic</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script defer src="/assets/login.js"></script>
+  </head>
+  <body class="auth-body">
+    <main class="auth-page">
+      <section class="login-card">
+        <div class="login-logo">L</div>
+        <h1>Linux AI Diagnostic</h1>
+        <p class="sub">Linux 只读诊断管理平台</p>
+        <p class="sub">使用企业飞书身份登录</p>
+        <a class="primary login-button" href="/auth/feishu"
+          >使用飞书账号登录
+          <svg class="icon" aria-hidden="true">
+            <use href="/assets/icons.svg#arrow"></use></svg
+        ></a>
+        <div class="login-hint">
+          管理员权限由 Web 中配置的飞书 Open ID 控制。<br />内网 HTTP 与 HTTPS
+          使用相同的身份验证流程。
+        </div>
+        <p id="loginError" class="status error" role="alert" hidden></p>
+        <p class="sub login-foot">专用 SSH 凭据 · 主机公钥核验 · 操作审计</p>
+      </section>
+    </main>
+  </body>
+</html>
